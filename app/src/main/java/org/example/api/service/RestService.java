@@ -1,9 +1,9 @@
-package org.example.service;
+package org.example.api.service;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import org.example.model.Error;
+import org.example.api.model.Error;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
@@ -108,17 +108,6 @@ public class RestService {
             return getError(e);
         }
     }
-
-//    public String getServices() {
-//        try {
-//            System.out.println(NewPipe.getServices());
-//            return objectMapper.writeValueAsString(NewPipe.getServices());
-//        } catch (Exception e) {
-//            System.err.println("Search info Extraction Error:");
-//            e.printStackTrace();
-//            return getError(e);
-//        }
-//    }
 
     public String getServices() {
         try {

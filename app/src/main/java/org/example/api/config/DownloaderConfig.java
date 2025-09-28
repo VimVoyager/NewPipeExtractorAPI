@@ -1,7 +1,7 @@
-package org.example.config;
+package org.example.api.config;
 
 import okhttp3.OkHttpClient;
-import org.example.DownloaderImpl;
+import org.example.api.DownloaderImpl;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

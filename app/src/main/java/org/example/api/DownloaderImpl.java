@@ -1,4 +1,4 @@
-package org.example;
+package org.example.api;
 
 import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
@@ -13,6 +13,7 @@ import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.io.InputStream;
 import java.util.List;
@@ -23,7 +24,7 @@ public class DownloaderImpl extends Downloader {
 
     private static DownloaderImpl instance;
     private String mCookies;
-    private OkHttpClient client;
+    private final OkHttpClient client;
 
     private DownloaderImpl(OkHttpClient.Builder builder) {
         this.client = builder
@@ -50,7 +51,7 @@ public class DownloaderImpl extends Downloader {
     public long getContentLength(String url) throws IOException {
         try {
             final Response response = head(url);
-            return Long.parseLong(response.getHeader("Content-Length"));
+            return Long.parseLong(Objects.requireNonNull(response.getHeader("Content-Length")));
         } catch (NumberFormatException e) {
             throw new IOException("Invalid content length", e);
         } catch (ReCaptchaException e) {

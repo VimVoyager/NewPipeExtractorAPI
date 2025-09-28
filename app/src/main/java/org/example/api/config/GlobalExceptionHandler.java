@@ -1,6 +1,6 @@
-package org.example.config;
+package org.example.api.config;
 
-import org.example.service.RestService;
+import org.example.api.service.RestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ControllerAdvice;
