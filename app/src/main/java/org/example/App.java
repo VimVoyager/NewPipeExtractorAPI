@@ -3,112 +3,25 @@
  */
 package org.example;
 
+import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.extractor.localization.Localization;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import spark.utils.StringUtils;
 
-import static spark.Spark.*;
-
-import java.util.*;
-
+@SpringBootApplication
 public class App {
+    private static final Logger logger = LoggerFactory.getLogger(App.class);
+
     public static void main(String[] args) {
 
-        RestService service = new RestService();
+        DownloaderImpl downloader = DownloaderImpl.init(null);
+        logger.info("DownloaderImpl initialized: {}", downloader);
 
-        CORS.enable("*");
+        NewPipe.init(downloader, new Localization("en", "GB"));
+        logger.info("NewPipe initialized successfully");
 
-        before((request, response) -> response.type("application/json"));
-
-        exception(Exception.class, (exception, request, response) -> {
-            response.status(500);
-            response.body(service.getError(exception));
-        });
-
-        path("/api/v1", () -> {
-            get("/services", (req, res) -> service.getServices());
-
-            get("/streams", (req, res) -> {
-                String url = req.queryParams("url");
-                return service.getStreamInfo(url);
-            });
-
-            get("/search", (req, res) -> {
-                int serviceId = Integer.valueOf(req.queryParams("serviceId"));
-                String searchString = req.queryParams("searchString");
-                String sortFilter = req.queryParams("sortFilter");
-                String contentFiltersData = req.queryParams("contentFilters");
-                List<String> contentFilters = Collections.emptyList();
-                if (!StringUtils.isEmpty(contentFiltersData)) {
-                    contentFilters = Arrays.asList(contentFiltersData.split(","));
-                }
-                return service.getSearchInfo(serviceId, searchString, contentFilters, sortFilter);
-            });
-
-            get("/search/page", (req, res) -> {
-                int serviceId = Integer.valueOf(req.queryParams("serviceId"));
-                String searchString = req.queryParams("searchString");
-                String sortFilter = req.queryParams("sortFilter");
-                String contentFiltersData = req.queryParams("contentFilters");
-                List<String> contentFilters = Collections.emptyList();
-                if (!StringUtils.isEmpty(contentFiltersData)) {
-                    contentFilters = Arrays.asList(contentFiltersData.split(","));
-                }
-                String pageUrl = req.queryParams("pageUrl");
-                return service.getSearchPage(serviceId, searchString, contentFilters, sortFilter, pageUrl);
-            });
-
-            get("/playlists", (req, res) -> {
-                String url = req.queryParams("url");
-                return service.getPlaylistInfo(url);
-            });
-
-            get("/playlists/page", (req, res) -> {
-                String url = req.queryParams("url");
-                String pageUrl = req.queryParams("pageUrl");
-                return service.getPlaylistPage(url, pageUrl);
-            });
-
-            get("/channels", (req, res) -> {
-                String url = req.queryParams("url");
-                return service.getChannelInfo(url);
-            });
-
-//            get("/channels/page", (req, res) -> {
-//                String url = req.queryParams("url");
-//                String pageUrl = req.queryParams("pageUrl");
-//                return service.getChannelPage(url, pageUrl);
-//            });
-
-            get("/kiosks", (req, res) -> {
-                int serviceId = Integer.valueOf(req.queryParams("serviceId"));
-                return service.getKioskIdsList(serviceId);
-            });
-
-            get("/kiosks/:kioskId", (req, res) -> {
-                String kioskId = req.params(":kioskId");
-                int serviceId = Integer.valueOf(req.queryParams("serviceId"));
-                return service.getKioskInfo(serviceId, kioskId);
-            });
-
-            get("/kiosks/:kioskId/page", (req, res) -> {
-                String kioskId = req.params(":kioskId");
-                int serviceId = Integer.valueOf(req.queryParams("serviceId"));
-                String pageUrl = req.queryParams("pageUrl");
-                return service.getKioskPage(serviceId, kioskId, pageUrl);
-            });
-
-            get("/comments", (req, res) -> {
-                String url = req.queryParams("url");
-                return service.getCommentsInfo(url);
-            });
-
-            get("/comments/page", (req, res) -> {
-                String url = req.queryParams("url");
-                String pageUrl = req.queryParams("pageUrl");
-                return service.getCommentsPage(url, pageUrl);
-            });
-        });
-
+        SpringApplication.run(App.class, args);
     }
 }

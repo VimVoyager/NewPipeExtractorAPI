@@ -8,8 +8,8 @@
 plugins {
     // Apply the application plugin to add support for building a CLI application in Java.
     id 'java'
-   // id 'org.springframework.boot' version '3.5.6'
-   // id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.springframework.boot' version '3.5.6'
+    id 'io.spring.dependency-management' version '1.1.7'
     id 'application'
 }
 
@@ -44,6 +44,10 @@ java {
     }
 }
 
+compileJava {
+    options.compilerArgs += ['-parameters']
+}
+
 application {
     // Define the main class for the application.
     mainClass = 'org.example.App'
@@ -57,8 +61,8 @@ tasks.named('distTar') {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-//tasks.named('bootJar') {
+tasks.named('bootJar') {
     // Skip copying the embedded NewPipeExtractor jar that is already part of the dependency.
-//    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     // exclude '**/NewPipeExtractor-0023b22095a2d62a60cdfc87f4b5cd85c8b266c3.jar'
-//}
+}

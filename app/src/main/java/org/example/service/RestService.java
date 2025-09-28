@@ -1,51 +1,44 @@
-package org.example;
+package org.example.service;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.google.gson.GsonBuilder;
-import org.example.DownloaderImpl;
-
-import org.jspecify.annotations.NonNull;
-import com.fasterxml.jackson.core.JsonProcessingException;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Supplier;
-
+import org.example.model.Error;
+import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
-import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.channel.ChannelInfo;
 import org.schabi.newpipe.extractor.comments.CommentsInfo;
 import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
-import org.schabi.newpipe.extractor.exceptions.ParsingException;
 import org.schabi.newpipe.extractor.kiosk.KioskInfo;
-import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
+import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
+
+@Service
 public class RestService {
-
     private final ObjectMapper objectMapper;
 
     public RestService() {
-        DownloaderImpl downloader = DownloaderImpl.init(null);
-        NewPipe.init(downloader, new Localization("en", "GB"));
+        this.objectMapper = createCustomObjectMapper();
+    }
 
-        this.objectMapper = new ObjectMapper()
-                // Ignore properties that can't be serialized
+    private ObjectMapper createCustomObjectMapper() {
+        return new ObjectMapper()
                 .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
-                // Allow unknown properties
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-                // Register a mix-in to help with serialization
                 .registerModule(new SimpleModule()
                         .addSerializer(SearchInfo.class, new CustomSearchInfoSerializer())
                         .addSerializer(StreamingService.class, new CustomStreamingServiceSerializer())
@@ -57,8 +50,6 @@ public class RestService {
         @Override
         public void serialize(SearchInfo value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             gen.writeStartObject();
-
-            // Basic info
             gen.writeStringField("searchString", value.getSearchString());
             gen.writeNumberField("serviceId", value.getService() != null ? value.getService().getServiceId() : -1);
 
@@ -87,15 +78,13 @@ public class RestService {
         public void serialize(StreamingService value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             gen.writeStartObject();
             gen.writeNumberField("serviceId", value.getServiceId());
-            // gen.writeStringField("serviceName", value.getServiceName());
             gen.writeEndObject();
         }
     }
 
-    // Additional method to handle complex serialization with more control
+    // Utility method for safe serialization
     private String safeSerialize(Object obj) {
         try {
-            // Use a specialized ObjectWriter for more controlled serialization
             ObjectWriter writer = objectMapper.writer()
                     .without(SerializationFeature.FAIL_ON_EMPTY_BEANS)
                     .withDefaultPrettyPrinter();
@@ -120,38 +109,46 @@ public class RestService {
         }
     }
 
+//    public String getServices() {
+//        try {
+//            System.out.println(NewPipe.getServices());
+//            return objectMapper.writeValueAsString(NewPipe.getServices());
+//        } catch (Exception e) {
+//            System.err.println("Search info Extraction Error:");
+//            e.printStackTrace();
+//            return getError(e);
+//        }
+//    }
+
     public String getServices() {
         try {
-            return objectMapper.writeValueAsString(NewPipe.getServices());
+            // Verify NewPipe initialization
+            if (NewPipe.getServices() == null || NewPipe.getServices().isEmpty()) {
+                throw new IllegalStateException("NewPipe services are not initialized or empty");
+            }
+
+            List<StreamingService> services = NewPipe.getServices();
+            System.out.println("Found " + services.size() + " services");
+
+            // Create a simplified list of services
+            List<Map<String, Object>> serviceList = new ArrayList<>();
+            for (StreamingService service : services) {
+                Map<String, Object> serviceMap = new HashMap<>();
+                serviceMap.put("serviceId", service.getServiceId());
+                serviceMap.put("serviceName", service.getServiceInfo().getName());
+                serviceList.add(serviceMap);
+            }
+
+            return objectMapper.writeValueAsString(serviceList);
         } catch (Exception e) {
-            System.err.println("Search info Extraction Error:");
+            System.err.println("Services Extraction Error:");
             e.printStackTrace();
             return getError(e);
         }
     }
-
-    // Modify your existing methods to use this approach
-    public String getSearchInfo(int serviceId, String searchString, List<String> contentFilters, String sortFilter) throws ParsingException, ExtractionException, IOException {
-        try {
-            StreamingService service = NewPipe.getService(serviceId);
-            SearchInfo info = SearchInfo.getInfo(service, service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter));
-
-            // Additional logging for debugging
-            System.out.println("Search Info retrieved successfully");
-            System.out.println("Total items: " + (info.getRelatedItems() != null ? info.getRelatedItems().size() : "0"));
-
-            return objectMapper.writeValueAsString(info);
-        } catch (Exception e) {
-            // Comprehensive error logging
-            System.err.println("Search Info Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
 
     // Similar approach for other methods that return complex objects
-    public String getStreamInfo(@NonNull String url) throws IOException, ExtractionException {
+    public String getStreamInfo(String url) throws IOException, ExtractionException {
         try {
             StreamInfo info = StreamInfo.getInfo(url);
             return objectMapper.writeValueAsString(info);
@@ -162,8 +159,23 @@ public class RestService {
         }
     }
 
+    // Modify your existing methods to use this approach
+    public String getSearchInfo(int serviceId, String searchString, List<String> contentFilters, String sortFilter) throws Exception {
+        try {
+            StreamingService service = NewPipe.getService(serviceId);
+            SearchInfo info = SearchInfo.getInfo(service, service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter));
+
+            return objectMapper.writeValueAsString(info);
+        } catch (Exception e) {
+            // Comprehensive error logging
+            System.err.println("Search Info Extraction Error:");
+            e.printStackTrace();
+            return getError(e);
+        }
+    }
+
     // Example usage in other methods
-    public String getSearchPage(int serviceId, String searchString, List<String> contentFilters, String sortFilter, String pageUrl) {
+    public String getSearchPage(int serviceId, String searchString, List<String> contentFilters, String sortFilter, String pageUrl) throws Exception {
         return handlePaginatedResponse(() -> {
             try {
                 StreamingService service = NewPipe.getService(serviceId);
@@ -179,44 +191,10 @@ public class RestService {
         });
     }
 
-    public String getKioskIdsList(int serviceId) throws ExtractionException {
-        try {
-            StreamingService service = NewPipe.getService(serviceId);
-            List<String> res = new ArrayList<>();
-            service.getKioskList().getAvailableKiosks().forEach(k -> res.add(k));
-            return objectMapper.writeValueAsString(res);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
 
-    public String getKioskInfo(int serviceId, String kioskId) throws ExtractionException, IOException {
-        try {
-            StreamingService service = NewPipe.getService(serviceId);
-            String url = service.getKioskList().getListLinkHandlerFactoryByType(kioskId).getUrl(kioskId);
-            KioskInfo info = KioskInfo.getInfo(service, url);
-            return objectMapper.writeValueAsString(info);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
 
-    public String getKioskPage(int serviceId, String kioskId, String pageUrl) throws ExtractionException, IOException {
-        try {
-            StreamingService service = NewPipe.getService(serviceId);
-            Page pageInstance = new Page(pageUrl);
-            String url = service.getKioskList().getListLinkHandlerFactoryByType(kioskId).getUrl(kioskId);
-            InfoItemsPage<StreamInfoItem> page = KioskInfo.getMoreItems(service, url, pageInstance);
-            return objectMapper.writeValueAsString(page);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
 
-    public String getPlaylistInfo(@NonNull String url) throws IOException, ExtractionException {
+    public String getPlaylistInfo(String url) throws Exception {
         try {
             PlaylistInfo info = PlaylistInfo.getInfo(url);
             return objectMapper.writeValueAsString(info);
@@ -226,7 +204,7 @@ public class RestService {
         }
     }
 
-    public String getPlaylistPage(@NonNull String url, @NonNull String pageUrl) throws IOException, ExtractionException {
+    public String getPlaylistPage( String url, String pageUrl) throws Exception {
         try {
             StreamingService service = NewPipe.getServiceByUrl(url);
             Page pageInstance = new Page(pageUrl);
@@ -238,7 +216,7 @@ public class RestService {
         }
     }
 
-    public String getChannelInfo(@NonNull String url) throws IOException, ExtractionException {
+    public String getChannelInfo(String url) throws Exception {
         try {
             ChannelInfo info = ChannelInfo.getInfo(url);
             return objectMapper.writeValueAsString(info);
@@ -254,7 +232,45 @@ public class RestService {
 //        return objectManager.writeValueAsString(page);
 //    }
 
-    public String getCommentsInfo(@NonNull String url) throws IOException, ExtractionException {
+    public String getKioskInfo(int serviceId, String kioskId) throws Exception {
+        try {
+            StreamingService service = NewPipe.getService(serviceId);
+            String url = service.getKioskList().getListLinkHandlerFactoryByType(kioskId).getUrl(kioskId);
+            KioskInfo info = KioskInfo.getInfo(service, url);
+            return objectMapper.writeValueAsString(info);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return getError(e);
+        }
+    }
+
+    public String getKioskPage(int serviceId, String kioskId, String pageUrl) throws Exception {
+        try {
+            StreamingService service = NewPipe.getService(serviceId);
+            Page pageInstance = new Page(pageUrl);
+            String url = service.getKioskList().getListLinkHandlerFactoryByType(kioskId).getUrl(kioskId);
+            InfoItemsPage<StreamInfoItem> page = KioskInfo.getMoreItems(service, url, pageInstance);
+            return objectMapper.writeValueAsString(page);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return getError(e);
+        }
+    }
+
+    public String getKioskIdsList(int serviceId) throws Exception {
+        try {
+            StreamingService service = NewPipe.getService(serviceId);
+            List<String> res = new ArrayList<>();
+            service.getKioskList().getAvailableKiosks().forEach(k -> res.add(k));
+            return objectMapper.writeValueAsString(res);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return getError(e);
+        }
+    }
+
+
+    public String getCommentsInfo(String url) throws Exception {
         try {
             CommentsInfo info = CommentsInfo.getInfo(url);
             return objectMapper.writeValueAsString(info);
@@ -264,7 +280,7 @@ public class RestService {
         }
     }
 
-    public String getCommentsPage(@NonNull String url, @NonNull String pageUrl) throws IOException, ExtractionException {
+    public String getCommentsPage(String url, String pageUrl) throws Exception {
         try {
             //TODO optimize this. init page is fetched every time
             CommentsInfo info = CommentsInfo.getInfo(url);
