@@ -1,30 +1,26 @@
 package org.example.api.service;
 
-import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.example.api.model.Error;
+import org.example.api.utils.SerializationUtils;
 import org.schabi.newpipe.extractor.NewPipe;
-import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.channel.ChannelInfo;
 import org.schabi.newpipe.extractor.comments.CommentsInfo;
 import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
-import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.kiosk.KioskInfo;
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 import org.schabi.newpipe.extractor.stream.*;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 
 @Service
 public class RestService {
@@ -39,73 +35,9 @@ public class RestService {
                 .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .registerModule(new SimpleModule()
-                        .addSerializer(SearchInfo.class, new CustomSearchInfoSerializer())
-                        .addSerializer(StreamingService.class, new CustomStreamingServiceSerializer())
+                        .addSerializer(SearchInfo.class, new SerializationUtils.CustomSearchInfoSerializer())
+                        .addSerializer(StreamingService.class, new SerializationUtils.CustomStreamingServiceSerializer())
                 );
-    }
-
-    // Custom serializer for SearchInfo to limit depth and control serialization
-    private static class CustomSearchInfoSerializer extends JsonSerializer<SearchInfo> {
-        @Override
-        public void serialize(SearchInfo value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            gen.writeStartObject();
-            gen.writeStringField("searchString", value.getSearchString());
-            gen.writeNumberField("serviceId", value.getService() != null ? value.getService().getServiceId() : -1);
-
-            // Carefully serialize items
-            gen.writeArrayFieldStart("items");
-            if (value.getRelatedItems() != null) {
-                for (InfoItem item : value.getRelatedItems()) {
-                    // Minimal serialization of items
-                    gen.writeStartObject();
-                    if (item != null) {
-                        gen.writeStringField("name", item.getName());
-                        gen.writeStringField("url", item.getUrl());
-                        // Add other essential fields as needed
-                    }
-                    gen.writeEndObject();
-                }
-            }
-            gen.writeEndArray();
-            gen.writeEndObject();
-        }
-    }
-
-    // Custom serializer for StreamingService to avoid nested serialization
-    private static class CustomStreamingServiceSerializer extends JsonSerializer<StreamingService> {
-        @Override
-        public void serialize(StreamingService value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            gen.writeStartObject();
-            gen.writeNumberField("serviceId", value.getServiceId());
-            gen.writeEndObject();
-        }
-    }
-
-    // Utility method for safe serialization
-    private String safeSerialize(Object obj) {
-        try {
-            ObjectWriter writer = objectMapper.writer()
-                    .without(SerializationFeature.FAIL_ON_EMPTY_BEANS)
-                    .withDefaultPrettyPrinter();
-
-            return writer.writeValueAsString(obj);
-        } catch (Exception e) {
-            System.err.println("Serialization Error: " + e.getMessage());
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    // Advanced method to handle pagination and complex responses
-    public String handlePaginatedResponse(Supplier<Object> infoExtractor) {
-        try {
-            Object info = infoExtractor.get();
-            return safeSerialize(info);
-        } catch (Exception e) {
-            System.err.println("Pagination Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
     }
 
     public String getServices() {
@@ -134,119 +66,6 @@ public class RestService {
             return getError(e);
         }
     }
-
-    // Similar approach for other methods that return complex objects
-    public String getStreamInfo(String url) throws IOException, ExtractionException {
-        try {
-            StreamInfo info = StreamInfo.getInfo(url);
-            return objectMapper.writeValueAsString(info);
-        } catch (Exception e) {
-            System.err.println("Stream Info Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    public String getAudioStreams(String url) throws IOException, ExtractionException {
-        try {
-            List<AudioStream> audioStreams = StreamInfo.getInfo(url).getAudioStreams();
-            return objectMapper.writeValueAsString(audioStreams);
-        } catch (Exception e) {
-            System.err.println("Audio Stream Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    public String getVideoStreams(String url) throws IOException, ExtractionException {
-        try {
-            List<VideoStream> videoStreams = StreamInfo.getInfo(url).getVideoStreams();
-            return objectMapper.writeValueAsString(videoStreams);
-        } catch (Exception e) {
-            System.err.println("Video Stream Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    public String getSubtitleStreams(String url) throws IOException, ExtractionException {
-        try {
-            List<SubtitlesStream> subtitleStreams = StreamInfo.getInfo(url).getSubtitles();
-            return objectMapper.writeValueAsString(subtitleStreams);
-        } catch (Exception e) {
-            System.err.println("Subtitles Stream Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    public String getStreamSegments(String url) throws IOException, ExtractionException {
-        try {
-            List<StreamSegment> segments = StreamInfo.getInfo(url).getStreamSegments();
-            return objectMapper.writeValueAsString(segments);
-        } catch (Exception e) {
-            System.err.println("Stream segments extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    public String getPreviewFrames(String url) throws IOException, ExtractionException {
-        try {
-            List<Frameset> framesets = StreamInfo.getInfo(url).getPreviewFrames();
-            return objectMapper.writeValueAsString(framesets);
-        } catch (Exception e) {
-            System.err.println("Preview Frames Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    public String getStreamDescription(String url) throws IOException, ExtractionException {
-        try {
-            Description streamDescription = StreamInfo.getInfo(url).getDescription();
-            return objectMapper.writeValueAsString(streamDescription);
-        } catch (Exception e) {
-            System.err.println("Description Stream Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    // Modify your existing methods to use this approach
-    public String getSearchInfo(int serviceId, String searchString, List<String> contentFilters, String sortFilter) throws Exception {
-        try {
-            StreamingService service = NewPipe.getService(serviceId);
-            SearchInfo info = SearchInfo.getInfo(service, service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter));
-
-            return objectMapper.writeValueAsString(info);
-        } catch (Exception e) {
-            // Comprehensive error logging
-            System.err.println("Search Info Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    // Example usage in other methods
-    public String getSearchPage(int serviceId, String searchString, List<String> contentFilters, String sortFilter, String pageUrl) throws Exception {
-        return handlePaginatedResponse(() -> {
-            try {
-                StreamingService service = NewPipe.getService(serviceId);
-                Page pageInstance = new Page(pageUrl);
-                return SearchInfo.getMoreItems(
-                        service,
-                        service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter),
-                        pageInstance
-                );
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to extract search page", e);
-            }
-        });
-    }
-
-
-
 
     public String getPlaylistInfo(String url) throws Exception {
         try {

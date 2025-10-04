@@ -1,6 +1,8 @@
 package org.example.api.controller;
 
 import org.example.api.service.RestService;
+import org.example.api.service.SearchService;
+import org.example.api.service.VideoStreamingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,18 +12,61 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+/**
+ * REST controller for handling API requests for YouTube information from New Pipe Extractor.
+ *
+ * This class defines endpoints for fetching various types of stream data, such as
+ * audio streams, video streams, subtitles, and more, from YouTube using a specified ID.
+ * Utilizes the RestService to abstract the logic of interacting with YouTube.
+ * All endpoints are prefixed with "/api/v1".
+ *
+ * <p>
+ * The following constants and fields are defined:
+ * </p>
+ * <ul>
+ *    <li><b>YOUTUBE_URL</b>: A constant URL string that serves as the base for constructing
+ *        full URLs to YouTube videos based on their IDs.</li>
+ *    <li><b>logger</b>: A logger instance for logging events and errors within the controller.</li>
+ *    <li><b>restService</b>: An instance of RestService used to interact with YouTube for
+ *        retrieving stream data.</li>
+ * </ul>
+ *
+ * <p>
+ * The constructor uses Spring's dependency injection to initialize the RestService instance.
+ * </p>
+ */
 @RestController
 @RequestMapping("/api/v1")
 public class NewPipeController {
     private static final String YOUTUBE_URL = "https://www.youtube.com/watch?v=";
     private static final Logger logger = LoggerFactory.getLogger(NewPipeController.class);
     private final RestService restService;
+    private final VideoStreamingService videoStreamingService;
+    private final SearchService searchService;
 
     @Autowired
-    public NewPipeController(RestService restService) {
+    public NewPipeController(RestService restService, VideoStreamingService videoStreamingService, SearchService searchService) {
         this.restService = restService;
+        this.videoStreamingService = videoStreamingService;
+        this.searchService = searchService;
+
     }
 
+    /**
+     * Handles HTTP GET requests to retrieve a list of services.
+     *
+     * This endpoint interacts with a RestService to fetch the services' data.
+     * If the data retrieval is successful, a ResponseEntity containing the
+     * services in JSON format is returned with an HTTP 200 OK status.
+     *
+     * In case of any errors during the retrieval process, an appropriate error
+     * message is logged, and a ResponseEntity with an HTTP 500 Internal Server Error
+     * status is returned, containing a message about the failure.
+     *
+     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     *                           - A success response with the services data in JSON format if the retrieval is successful (HTTP 200 OK).
+     *                           - An error response with an appropriate message (HTTP 500 Internal Server Error) if an error occurs during the process.
+     */
     @GetMapping("/services")
     public ResponseEntity<?> getServices() {
         try {
@@ -48,6 +93,22 @@ public class NewPipeController {
         }
     }
 
+    /**
+     * Handles HTTP GET requests to retrieve stream information based on a provided ID.
+     *
+     * This endpoint requires an ID as a request parameter. It constructs a URL using
+     * the ID and interacts with the RestService to fetch stream information.
+     * On success, a ResponseEntity with the stream information in JSON format
+     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
+     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
+     * or HTTP 500 Internal Server Error).
+     *
+     * @param id The ID of the stream to retrieve information for.
+     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     *                           - A success response with the stream information in JSON format if the retrieval is successful (HTTP 200 OK).
+     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
+     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     */
     @GetMapping("/streams")
     public ResponseEntity<?> getStreamInfo(@RequestParam(name = "id") String id) {
         try {
@@ -61,7 +122,7 @@ public class NewPipeController {
             }
 
             String url = YOUTUBE_URL + id;
-            String streamInfoJson = restService.getStreamInfo(url);
+            String streamInfoJson = videoStreamingService.getStreamInfo(url);
 
             // Check if it's an error response
             if (streamInfoJson.contains("\"message\"")) {
@@ -82,6 +143,22 @@ public class NewPipeController {
         }
     }
 
+    /**
+     * Handles HTTP GET requests to retrieve audio stream information based on a provided ID.
+     *
+     * This endpoint requires an ID as a request parameter. It constructs a URL using
+     * the ID and interacts with the RestService to fetch audio stream information.
+     * On success, a ResponseEntity with the audio streams in JSON format
+     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
+     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
+     * or HTTP 500 Internal Server Error).
+     *
+     * @param id The ID of the stream to retrieve audio information for.
+     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     *                           - A success response with the audio stream information in JSON format if the retrieval is successful (HTTP 200 OK).
+     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
+     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     */
     @GetMapping("/streams/audio")
     public ResponseEntity<?> getAudioStreams(@RequestParam(name = "id") String id) throws Exception {
         try {
@@ -95,7 +172,7 @@ public class NewPipeController {
             }
 
             String url = YOUTUBE_URL + id;
-            String audioStreamsJson = restService.getAudioStreams(url);
+            String audioStreamsJson = videoStreamingService.getAudioStreams(url);
 
             // Check if it's an error response
             if (audioStreamsJson.contains("\"message\"")) {
@@ -117,6 +194,22 @@ public class NewPipeController {
         }
     }
 
+    /**
+     * Handles HTTP GET requests to retrieve video stream information based on a provided ID.
+     *
+     * This endpoint requires an ID as a request parameter. It constructs a URL using
+     * the ID and interacts with the RestService to fetch video stream information.
+     * On success, a ResponseEntity with the video streams in JSON format
+     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
+     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
+     * or HTTP 500 Internal Server Error).
+     *
+     * @param id The ID of the stream to retrieve video information for.
+     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     *                           - A success response with the video stream information in JSON format if the retrieval is successful (HTTP 200 OK).
+     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
+     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     */
     @GetMapping("/streams/video")
     public ResponseEntity<?> getVideoStreams(@RequestParam(name = "id") String id) throws Exception {
         try {
@@ -130,7 +223,7 @@ public class NewPipeController {
             }
 
             String url = YOUTUBE_URL + id;
-            String videoStreamsJson = restService.getVideoStreams(url);
+            String videoStreamsJson = videoStreamingService.getVideoStreams(url);
 
             // Check if it's an error response
             if (videoStreamsJson.contains("\"message\"")) {
@@ -152,6 +245,22 @@ public class NewPipeController {
         }
     }
 
+    /**
+     * Handles HTTP GET requests to retrieve subtitle stream information based on a provided ID.
+     *
+     * This endpoint requires an ID as a request parameter. It constructs a URL using
+     * the ID and interacts with the RestService to fetch subtitle stream information.
+     * On success, a ResponseEntity with the subtitle streams in JSON format
+     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
+     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
+     * or HTTP 500 Internal Server Error).
+     *
+     * @param id The ID of the stream to retrieve subtitle information for.
+     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     *                           - A success response with the subtitle stream information in JSON format if the retrieval is successful (HTTP 200 OK).
+     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
+     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     */
     @GetMapping("/streams/subtitles")
     public ResponseEntity<?> getSubtitleStreams(@RequestParam(name = "id") String id) throws Exception {
         try {
@@ -165,7 +274,7 @@ public class NewPipeController {
             }
 
             String url = YOUTUBE_URL + id;
-            String subtitleStreamsJson = restService.getSubtitleStreams(url);
+            String subtitleStreamsJson = videoStreamingService.getSubtitleStreams(url);
 
             // Check if it's an error response
             if (subtitleStreamsJson.contains("\"message\"")) {
@@ -187,6 +296,22 @@ public class NewPipeController {
         }
     }
 
+    /**
+     * Handles HTTP GET requests to retrieve stream segments based on a provided ID.
+     *
+     * This endpoint requires an ID as a request parameter. It constructs a URL using
+     * the ID and interacts with the RestService to fetch stream segments.
+     * On success, a ResponseEntity with the stream segments in JSON format
+     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
+     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
+     * or HTTP 500 Internal Server Error).
+     *
+     * @param id The ID of the stream to retrieve segments for.
+     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     *                           - A success response with the stream segments in JSON format if the retrieval is successful (HTTP 200 OK).
+     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
+     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     */
     @GetMapping("/streams/segments")
     public ResponseEntity<?> getStreamSegments(@RequestParam(name = "id") String id) throws Exception {
         try {
@@ -200,7 +325,7 @@ public class NewPipeController {
             }
 
             String url = YOUTUBE_URL + id;
-            String streamFramesJson = restService.getPreviewFrames(url);
+            String streamFramesJson = videoStreamingService.getPreviewFrames(url);
 
             // Check if it's an error response
             if (streamFramesJson.contains("\"message\"")) {
@@ -222,6 +347,22 @@ public class NewPipeController {
         }
     }
 
+    /**
+     * Handles HTTP GET requests to retrieve preview frames for a stream based on a provided ID.
+     *
+     * This endpoint requires an ID as a request parameter. It constructs a URL using
+     * the ID and interacts with the RestService to fetch preview frames.
+     * On success, a ResponseEntity with the preview frames in JSON format
+     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
+     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
+     * or HTTP 500 Internal Server Error).
+     *
+     * @param id The ID of the stream to retrieve preview frames for.
+     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     *                           - A success response with the preview frames in JSON format if the retrieval is successful (HTTP 200 OK).
+     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
+     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     */
     @GetMapping("/streams/frames")
     public ResponseEntity<?> getPreviewFrames(@RequestParam(name = "id") String id) throws Exception {
         try {
@@ -235,7 +376,7 @@ public class NewPipeController {
             }
 
             String url = YOUTUBE_URL + id;
-            String streamFramesJson = restService.getPreviewFrames(url);
+            String streamFramesJson = videoStreamingService.getPreviewFrames(url);
 
             // Check if it's an error response
             if (streamFramesJson.contains("\"message\"")) {
@@ -257,6 +398,22 @@ public class NewPipeController {
         }
     }
 
+    /**
+     * Handles HTTP GET requests to retrieve the description of a stream based on a provided ID.
+     *
+     * This endpoint requires an ID as a request parameter. It constructs a URL using
+     * the ID and interacts with the RestService to fetch the stream description.
+     * On success, a ResponseEntity with the stream description in JSON format
+     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
+     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
+     * or HTTP 500 Internal Server Error).
+     *
+     * @param id The ID of the stream to retrieve description for.
+     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     *                           - A success response with the stream description in JSON format if the retrieval is successful (HTTP 200 OK).
+     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
+     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     */
     @GetMapping("/streams/description")
     public ResponseEntity<?> getStreamDescription(@RequestParam(name = "id") String id) throws Exception {
         try {
@@ -270,7 +427,7 @@ public class NewPipeController {
             }
 
             String url = YOUTUBE_URL + id;
-            String streamDescriptionJson = restService.getStreamDescription(url);
+            String streamDescriptionJson = videoStreamingService.getStreamDescription(url);
 
             // Check if it's an error response
             if (streamDescriptionJson.contains("\"message\"")) {
@@ -312,7 +469,7 @@ public class NewPipeController {
                     ? Arrays.asList(contentFilters.split(","))
                     : Collections.emptyList();
 
-            String searchInfoJson = restService.getSearchInfo(
+            String searchInfoJson = searchService.getSearchInfo(
                     serviceId,
                     searchString,
                     contentFilterList,
@@ -365,7 +522,7 @@ public class NewPipeController {
                     ? Arrays.asList(contentFilters.split(","))
                     : Collections.emptyList();
 
-            String searchPageJson = restService.getSearchPage(
+            String searchPageJson = searchService.getSearchPage(
                     serviceId,
                     searchString,
                     contentFilterList,
