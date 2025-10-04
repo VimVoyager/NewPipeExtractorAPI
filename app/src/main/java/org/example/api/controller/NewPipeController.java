@@ -325,16 +325,16 @@ public class NewPipeController {
             }
 
             String url = YOUTUBE_URL + id;
-            String streamFramesJson = videoStreamingService.getPreviewFrames(url);
+            String streamSegmentsJson = videoStreamingService.getStreamSegments(url);
 
             // Check if it's an error response
-            if (streamFramesJson.contains("\"message\"")) {
+            if (streamSegmentsJson.contains("\"message\"")) {
                 Map<String, String> errorResponse = new HashMap<>();
                 errorResponse.put("message", "Error retrieving stream segments");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
             }
 
-            return ResponseEntity.ok(streamFramesJson);
+            return ResponseEntity.ok(streamSegmentsJson);
         } catch (Exception e) {
 
             logger.error("Error retrieving stream segments for ID: {}", id, e);
