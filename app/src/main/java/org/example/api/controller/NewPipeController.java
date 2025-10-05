@@ -63,7 +63,7 @@ public class NewPipeController {
      * message is logged, and a ResponseEntity with an HTTP 500 Internal Server Error
      * status is returned, containing a message about the failure.
      *
-     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     * @return A ResponseEntity object containing either:
      *                           - A success response with the services data in JSON format if the retrieval is successful (HTTP 200 OK).
      *                           - An error response with an appropriate message (HTTP 500 Internal Server Error) if an error occurs during the process.
      */
@@ -104,7 +104,7 @@ public class NewPipeController {
      * or HTTP 500 Internal Server Error).
      *
      * @param id The ID of the stream to retrieve information for.
-     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     * @return A ResponseEntity object containing either:
      *                           - A success response with the stream information in JSON format if the retrieval is successful (HTTP 200 OK).
      *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
      *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
@@ -154,7 +154,7 @@ public class NewPipeController {
      * or HTTP 500 Internal Server Error).
      *
      * @param id The ID of the stream to retrieve audio information for.
-     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     * @return A ResponseEntity object containing either:
      *                           - A success response with the audio stream information in JSON format if the retrieval is successful (HTTP 200 OK).
      *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
      *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
@@ -205,7 +205,7 @@ public class NewPipeController {
      * or HTTP 500 Internal Server Error).
      *
      * @param id The ID of the stream to retrieve video information for.
-     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     * @return A ResponseEntity object containing either:
      *                           - A success response with the video stream information in JSON format if the retrieval is successful (HTTP 200 OK).
      *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
      *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
@@ -256,7 +256,7 @@ public class NewPipeController {
      * or HTTP 500 Internal Server Error).
      *
      * @param id The ID of the stream to retrieve subtitle information for.
-     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     * @return A ResponseEntity object containing either:
      *                           - A success response with the subtitle stream information in JSON format if the retrieval is successful (HTTP 200 OK).
      *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
      *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
@@ -307,7 +307,7 @@ public class NewPipeController {
      * or HTTP 500 Internal Server Error).
      *
      * @param id The ID of the stream to retrieve segments for.
-     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     * @return  A ResponseEntity object containing either:
      *                           - A success response with the stream segments in JSON format if the retrieval is successful (HTTP 200 OK).
      *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
      *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
@@ -358,7 +358,7 @@ public class NewPipeController {
      * or HTTP 500 Internal Server Error).
      *
      * @param id The ID of the stream to retrieve preview frames for.
-     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     * @return A ResponseEntity object containing either:
      *                           - A success response with the preview frames in JSON format if the retrieval is successful (HTTP 200 OK).
      *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
      *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
@@ -409,7 +409,7 @@ public class NewPipeController {
      * or HTTP 500 Internal Server Error).
      *
      * @param id The ID of the stream to retrieve description for.
-     * @return ResponseEntity<?> A ResponseEntity object containing either:
+     * @return  A ResponseEntity object containing either:
      *                           - A success response with the stream description in JSON format if the retrieval is successful (HTTP 200 OK).
      *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
      *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
