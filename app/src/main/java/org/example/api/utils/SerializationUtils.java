@@ -9,6 +9,13 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
+/**
+ * Utility class for custom JSON serialization of complex objects.
+ *
+ * This class provides specialized serialization methods to handle
+ * complex objects from the NewPipe extractor, ensuring safe and
+ * controlled JSON conversion.
+ */
 @Component
 public class SerializationUtils {
     private final ObjectMapper objectMapper;
@@ -17,8 +24,23 @@ public class SerializationUtils {
         this.objectMapper = objectMapper; // Inject ObjectMapper if needed
     }
 
-    // Custom serializer for SearchInfo to limit depth and control serialization
+    /**
+     * Custom JSON serializer for SearchInfo objects.
+     *
+     * This serializer provides a controlled way to convert SearchInfo
+     * objects to JSON, limiting the depth and including only essential
+     * information.
+     */
     public static class CustomSearchInfoSerializer extends JsonSerializer<SearchInfo> {
+
+        /**
+         * Serialize a SearchInfo object with minimal, essential information.
+         *
+         * @param value The SearchInfo object to serialize
+         * @param gen JsonGenerator for writing JSON content
+         * @param serializers Serializer provider
+         * @throws IOException If an error occurs during serialization
+         */
         @Override
         public void serialize(SearchInfo value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             gen.writeStartObject();
@@ -44,8 +66,22 @@ public class SerializationUtils {
         }
     }
 
-    // Custom serializer for StreamingService to avoid nested serialization
+    /**
+     * Custom JSON serializer for StreamingService objects.
+     *
+     * This serializer provides a simplified JSON representation
+     * of StreamingService, avoiding nested serialization.
+     */
     public static class CustomStreamingServiceSerializer extends JsonSerializer<StreamingService> {
+
+        /**
+         * Serialize a StreamingService object with minimal information.
+         *
+         * @param value The StreamingService object to serialize
+         * @param gen JsonGenerator for writing JSON content
+         * @param serializers Serializer provider
+         * @throws IOException If an error occurs during serialization
+         */
         @Override
         public void serialize(StreamingService value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             gen.writeStartObject();
@@ -54,7 +90,15 @@ public class SerializationUtils {
         }
     }
 
-    // Utility method for safe serialization
+    /**
+     * Safely serialize an object to a JSON string.
+     *
+     * This method provides a robust way to convert objects to JSON,
+     * with error handling and pretty-printing.
+     *
+     * @param obj The object to be serialized
+     * @return A JSON string representation of the object
+     */
     public String safeSerialize(Object obj) {
         try {
             ObjectWriter writer = objectMapper.writer()
