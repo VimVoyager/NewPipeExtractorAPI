@@ -5,10 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.schabi.newpipe.extractor.stream.AudioStream;
-import org.schabi.newpipe.extractor.stream.StreamInfo;
-import org.schabi.newpipe.extractor.stream.SubtitlesStream;
-import org.schabi.newpipe.extractor.stream.VideoStream;
+import org.schabi.newpipe.extractor.stream.*;
 
 import java.util.Arrays;
 import java.util.List;
@@ -118,11 +115,36 @@ public class VideoStreamingServiceTest {
             when(objectMapper.writeValueAsString(mockSubtitlesStreams)).thenReturn(expectedJsonResponse);
 
             // Act
-            String result = videoStreamingService.getVideoStreams(TEST_URL);
+            String result = videoStreamingService.getSubtitleStreams(TEST_URL);
 
             // Assert
             assertEquals(expectedJsonResponse, result);
             verify(objectMapper).writeValueAsString(mockSubtitlesStreams);
+        }
+    }
+
+    @Test
+    public void testGetStreamSegments() throws Exception {
+        // Arrange
+        StreamSegment mockStreamSegment = mock(StreamSegment.class);
+        List<StreamSegment> mockStreamSegments = Arrays.asList(mockStreamSegment);
+
+        when(mockStreamInfo.getStreamSegments()).thenReturn(mockStreamSegments);
+
+        String expectedJsonResponse = "[{\"id\":\"test\"}]";
+
+        try (var mockedStatic = mockStatic(StreamInfo.class)) {
+            mockedStatic.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+
+            // Mock JSON serialization
+            when(objectMapper.writeValueAsString(mockStreamSegments)).thenReturn(expectedJsonResponse);
+
+            // Act
+            String result = videoStreamingService.getVideoStreams(TEST_URL);
+
+            // Assert
+            assertEquals(expectedJsonResponse, result);
+            verify(objectMapper).writeValueAsString(mockStreamSegments);
         }
     }
 }
