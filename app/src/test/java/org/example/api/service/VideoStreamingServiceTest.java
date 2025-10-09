@@ -147,6 +147,55 @@ public class VideoStreamingServiceTest {
             verify(objectMapper).writeValueAsString(mockStreamSegments);
         }
     }
+
+    @Test
+    public void testGetPreviewStreams() throws Exception {
+        // Arrange
+        Frameset mockPreviewFrame = mock(Frameset.class);
+        List<Frameset> mockPreviewFrames = Arrays.asList(mockPreviewFrame);
+
+        when(mockStreamInfo.getPreviewFrames()).thenReturn(mockPreviewFrames);
+
+        String expectedJsonResponse = "[{\"id\":\"test\"}]";
+
+        try (var mockedStatic = mockStatic(StreamInfo.class)) {
+            mockedStatic.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+
+            // Mock JSON serialization
+            when(objectMapper.writeValueAsString(mockPreviewFrames)).thenReturn(expectedJsonResponse);
+
+            // Act
+            String result = videoStreamingService.getPreviewFrames(TEST_URL);
+
+            // Assert
+            assertEquals(expectedJsonResponse, result);
+            verify(objectMapper).writeValueAsString(mockPreviewFrames);
+        }
+    }
+
+    @Test
+    public void testGetStreamDescription() throws Exception {
+        // Arrange
+        Description mockStreamDescription = mock(Description.class);
+
+        when(mockStreamInfo.getDescription()).thenReturn(mockStreamDescription);
+
+        String expectedJsonResponse = "[{\"id\":\"test\"}]";
+
+        try (var mockedStatic = mockStatic(StreamInfo.class)) {
+            mockedStatic.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+
+            // Mock JSON serialization
+            when(objectMapper.writeValueAsString(mockStreamDescription)).thenReturn(expectedJsonResponse);
+
+            // Act
+            String result = videoStreamingService.getStreamDescription(TEST_URL);
+
+            // Assert
+            assertEquals(expectedJsonResponse, result);
+            verify(objectMapper).writeValueAsString(mockStreamDescription);
+        }
+    }
 }
 
 
