@@ -140,7 +140,7 @@ public class VideoStreamingServiceTest {
             when(objectMapper.writeValueAsString(mockStreamSegments)).thenReturn(expectedJsonResponse);
 
             // Act
-            String result = videoStreamingService.getVideoStreams(TEST_URL);
+            String result = videoStreamingService.getStreamSegments(TEST_URL);
 
             // Assert
             assertEquals(expectedJsonResponse, result);
