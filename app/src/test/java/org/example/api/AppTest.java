@@ -3,10 +3,11 @@
  */
 package org.example.api;
 
-import org.junit.Test;
-import static org.junit.Assert.*;
+
+import org.junit.jupiter.api.Test;
 
 public class AppTest {
-    @Test public void appHasAGreeting() {
+    @Test
+    public void appHasAGreeting() {
     }
 }
