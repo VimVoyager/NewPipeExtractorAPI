@@ -14,7 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.HashMap;
 import java.util.Map;
 
-
+/**
+ * REST controller for handling streaming-related API requests for YouTube information.
+ * This class provides endpoints for retrieving stream and audio stream data based on provided IDs.
+ * All endpoints are prefixed with "/api/v1/streams".
+ */
 @RestController
 @RequestMapping("/api/v1/streams")
 public class StreamingController {
