@@ -13,17 +13,40 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.*;
 
+/**
+ * REST controller for handling search-related API requests for YouTube information.
+ * This class provides endpoints for searching videos based on various parameters
+ * such as service ID and search string. All endpoints are prefixed with "/api/v1/search".
+ */
 @RestController
 @RequestMapping("/api/v1/search")
 public class SearchController {
     private static final Logger logger = LoggerFactory.getLogger(SearchController.class);
     private final SearchService searchService;
 
+    /**
+     * Constructs a new SearchController with the specified SearchService.
+     *
+     * @param searchService an instance of SearchService used to handle search operations.
+     */
     @Autowired
     public SearchController(SearchService searchService) {
         this.searchService = searchService;
     }
 
+    /**
+     * Handles HTTP GET requests to retrieve search information based on the provided service ID and search string.
+     *
+     * @param serviceId      the ID of the service for which to perform the search.
+     * @param searchString   the string to use for searching; must not be null or empty.
+     * @param sortFilter     an optional parameter to sort the results; can be null.
+     * @param contentFilters  an optional comma-separated list of content filters to apply; can be null.
+     * @return a ResponseEntity containing either:
+     *         - A success response with the search information in JSON format (HTTP 200 OK),
+     *         - A bad request response if the search string is missing (HTTP 400 Bad Request),
+     *         - An error response if an internal error occurs (HTTP 500 Internal Server Error).
+     * @throws Exception if an unexpected error occurs while retrieving search information.
+     */
     @GetMapping("/")
     public ResponseEntity<?> getSearchInfo(
             @RequestParam(name = "serviceId") int serviceId,
@@ -70,6 +93,21 @@ public class SearchController {
         }
     }
 
+    /**
+     * Handles HTTP GET requests to retrieve a search page based on the provided parameters.
+     *
+     * @param serviceId      the ID of the service for which to perform the search.
+     * @param searchString   the string to use for searching; must not be null or empty.
+     * @param sortFilter     an optional parameter to sort the results; can be null.
+     * @param contentFilters  an optional comma-separated list of content filters to apply; can be null.
+     * @param pageUrl       the URL of the page to retrieve; must not be null or empty.
+     * @return a ResponseEntity containing either:
+     *         - A success response with the search page information in JSON format (HTTP 200 OK),
+     *         - A bad request response if the search string or page URL is missing (HTTP 400 Bad Request),
+     *         - An error response if an internal error occurs (HTTP 500 Internal Server
+     *         - An error response if an internal error occurs (HTTP 500 Internal Server Error).
+     * @throws Exception if an unexpected error occurs while retrieving the search page.
+     */
     @GetMapping("/page")
     public ResponseEntity<?> getSearchPage(
             @RequestParam(name = "serviceId") int serviceId,
