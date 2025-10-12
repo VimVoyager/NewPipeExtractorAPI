@@ -74,11 +74,12 @@ public class SearchController {
                     sortFilter
             );
 
-            if (searchInfoJson.contains("\"message\"")) {
+            if (searchInfoJson == null || searchInfoJson.contains("\"message\"")) {
                 Map<String, String> errorResponse = new HashMap<>();
                 errorResponse.put("message", "Error retrieving search info");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
             }
+
             return ResponseEntity.ok(searchInfoJson);
         } catch (Exception e) {
             logger.error("Error retrieving search info for serviceId: {}, searchString: {}",

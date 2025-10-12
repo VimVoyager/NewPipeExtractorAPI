@@ -42,6 +42,11 @@ public class StreamingControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(streamingController).build();
     }
 
+    /*
+    -----------------------------------------
+        Utility methods
+    -----------------------------------------
+    */
     private ResultActions performGetRequest(String videoId) throws Exception {
         String url = TEST_URL + videoId;
 
@@ -108,6 +113,11 @@ public class StreamingControllerTest {
         return mockMvc.perform(get(DESCRIPTION_ENDPOINT).param("id", videoId).accept(MediaType.APPLICATION_JSON));
     }
 
+    /*
+    -----------------------------------------
+        Tests for /streams endpoint
+    -----------------------------------------
+    */
     @Test
     public void testGetStreamInfo_ValidId_ReturnsOK() throws Exception {
         ResultActions result = performGetRequest(TEST_VIDEO_ID);
@@ -156,6 +166,11 @@ public class StreamingControllerTest {
         assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
     }
 
+    /*
+    -----------------------------------------
+        Tests for /streams/audio endpoint
+    -----------------------------------------
+    */
     @Test
     public void testGetAudioStreams_ValidId_ReturnsOK() throws Exception {
         ResultActions result = performGetAudioRequest(TEST_VIDEO_ID);
@@ -204,6 +219,11 @@ public class StreamingControllerTest {
         assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
     }
 
+    /*
+    -----------------------------------------
+        Tests for /streams/video endpoint
+    -----------------------------------------
+    */
     @Test
     public void testGetVideoStreams_ValidId_ReturnsOK() throws Exception {
         // Act
@@ -266,6 +286,11 @@ public class StreamingControllerTest {
         assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
     }
 
+    /*
+    -----------------------------------------
+        Tests for /streams/segments endpoint
+    -----------------------------------------
+    */
     @Test
     public void testGetStreamSegments_ValidId_ReturnsOK() throws Exception {
         // Act
@@ -328,6 +353,11 @@ public class StreamingControllerTest {
         assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
     }
 
+    /*
+    -----------------------------------------
+        Tests for /streams/frames endpoint
+    -----------------------------------------
+    */
     @Test
     public void testGetPreviewFrames_ValidId_ReturnsOK() throws Exception {
         // Act
@@ -390,6 +420,11 @@ public class StreamingControllerTest {
         assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
     }
 
+    /*
+    -------------------------------------------------
+        Tests for /streams/description endpoint
+    -------------------------------------------------
+    */
     @Test
     public void testGetStreamDescription_ValidId_ReturnsOK() throws Exception {
         // Act
