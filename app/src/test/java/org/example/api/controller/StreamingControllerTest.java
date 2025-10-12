@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -21,9 +22,11 @@ public class StreamingControllerTest {
     private MockMvc mockMvc;
 
     private static final String BASE_ENDPOINT = "/api/v1/streams/";
+    private static final String AUDIO_ENDPOINT = BASE_ENDPOINT + "audio";
     private static final String TEST_URL = "https://www.youtube.com/watch?v=";
     private static final String TEST_VIDEO_ID = "12345";
-    private static final String ERROR_MESSAGE = "{\"message\":\"Error retrieving stream info\"}";
+    private static final String ERROR_MESSAGE = "{\"message\":\"Error retrieving stream info\",\"details\":\"Service failure\"}";
+    private static final String AUDIO_ERROR_MESSAGE = "{\"message\":\"Error retrieving audio stream\",\"details\":\"Service failure\"}";
     private static final String EMPTY_ID_ERROR_MESSAGE = "{\"message\":\"ID parameter is required\"}";
 
     @Mock
@@ -49,6 +52,17 @@ public class StreamingControllerTest {
         return mockMvc.perform(get(BASE_ENDPOINT).param("id", videoId).accept(MediaType.APPLICATION_JSON));
     }
 
+    private ResultActions performGetAudioRequest(String videoId) throws Exception {
+        String url = TEST_URL + videoId;
+
+        if (videoId.isEmpty()) {
+            return mockMvc.perform(get(AUDIO_ENDPOINT).param("id", videoId));
+        }
+
+        when(videoStreamingService.getAudioStreams(url)).thenReturn("{\"audio\":\"some audio stream info\"}");
+        return mockMvc.perform(get(AUDIO_ENDPOINT).param("id", videoId).accept(MediaType.APPLICATION_JSON));
+    }
+
     @Test
     public void testGetStreamInfo_ValidId_ReturnsOK() throws Exception {
         ResultActions result = performGetRequest(TEST_VIDEO_ID);
@@ -72,7 +86,7 @@ public class StreamingControllerTest {
         ResultActions result = mockMvc.perform(get(BASE_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
 
         result.andExpect(status().isInternalServerError());
-        assertEquals("{\"message\":\"Error retrieving stream info\",\"details\":\"Service failure\"}", result.andReturn().getResponse().getContentAsString());
+        assertEquals(ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
     }
 
     @Test
@@ -83,16 +97,63 @@ public class StreamingControllerTest {
         ResultActions result = mockMvc.perform(get(BASE_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
 
         result.andExpect(status().isInternalServerError());
-        assertEquals("{\"message\":\"Error retrieving stream info\",\"details\":\"Service failure\"}", result.andReturn().getResponse().getContentAsString());
+        assertEquals(ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
     }
 
     @Test
     public void testGetStreamInfo_EmptyId_ReturnsBadRequest() throws Exception {
-        String expectedResponse = "{\"message\":\"ID parameter is required\"}";
         ResultActions result = performGetRequest("");
 
         // Assert the results
         result.andExpect(status().isBadRequest());
-        assertEquals(expectedResponse, result.andReturn().getResponse().getContentAsString());
+        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
+    }
+
+    @Test
+    public void testGetAudioStreams_ValidId_ReturnsOK() throws Exception {
+        ResultActions result = performGetAudioRequest(TEST_VIDEO_ID);
+
+        result.andExpect(status().isOk());
+        assertEquals("{\"audio\":\"some audio stream info\"}", result.andReturn().getResponse().getContentAsString());
+    }
+
+    @Test
+    public void testGetAudioStreams_MissingId_ReturnsBadRequest() throws Exception {
+        ResultActions result = mockMvc.perform(get(AUDIO_ENDPOINT)); // No ID provided.
+        result.andExpect(status().isBadRequest());
+//        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
+    }
+
+    @Test
+    public void testGetAudioStreams_ErrorResponseFromService_ReturnsInternalServerError() throws Exception {
+        String url = TEST_URL + TEST_VIDEO_ID;
+        when(videoStreamingService.getAudioStreams(url)).thenThrow(new RuntimeException("Service failure"));
+
+        ResultActions result = mockMvc.perform(get(AUDIO_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
+
+        result.andExpect(status().isInternalServerError());
+        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
+        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving audio stream"));
+    }
+
+    @Test
+    public void testGetAudioStreams_InternalException_ReturnsInternalServerError() throws Exception {
+        String url = TEST_URL + TEST_VIDEO_ID;
+        when(videoStreamingService.getAudioStreams(url)).thenThrow(new RuntimeException("Service failure"));
+
+        ResultActions result = mockMvc.perform(get(AUDIO_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
+
+        result.andExpect(status().isInternalServerError());
+        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
+        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving audio stream"));
+    }
+
+    @Test
+    public void testGetAudioStreams_EmptyId_ReturnsBadRequest() throws Exception {
+        ResultActions result = performGetAudioRequest("");
+
+        // Assert the results
+        result.andExpect(status().isBadRequest());
+        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
     }
 }
