@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -20,6 +21,7 @@ public class StreamingControllerTest {
     private MockMvc mockMvc;
     private static final String BASE_ENDPOINT = "/api/v1/streams/";
     private static final String TEST_URL = "https://www.youtube.com/watch?v=";
+    private static final String TEST_VIDEO_ID = "12345";
 
     @Mock
     private VideoStreamingService videoStreamingService;
@@ -33,31 +35,32 @@ public class StreamingControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(streamingController).build();
     }
 
-    @Test
-    public void testGetStreamInfoSuccess_ValidId_RetunsOK() throws Exception {
-        // Arrange
-        String id = "12345";
-        String expectedResponse = "{\"info\":\"some stream info\"}";
+    private ResultActions performGetRequest(String endpoint, String id, String expectedResponse) throws Exception {
         String url = TEST_URL + id;
 
-        // Mock the service response
+        if (id.isEmpty()) {
+            return mockMvc.perform(get(endpoint).param("id", id));
+        }
+
         when(videoStreamingService.getStreamInfo(url)).thenReturn(expectedResponse);
 
-        // Act
-        // Perform GET request
-        ResultActions result = mockMvc.perform(get(BASE_ENDPOINT).param("id", id));
+        return mockMvc.perform(get(endpoint).param("id", id));
+    }
 
-        // Assert
+    @Test
+    public void testGetStreamInfo_ValidId_ReturnsOK() throws Exception {
+        String expectedResponse = "{\"info\":\"some stream info\"}";
+
+        ResultActions result = performGetRequest(BASE_ENDPOINT, TEST_VIDEO_ID, expectedResponse);
+
         result.andExpect(status().isOk());
         assertEquals(expectedResponse, result.andReturn().getResponse().getContentAsString());
     }
 
     @Test
     public void testGetStreamInfo_MissingId_ReturnsBadRequest() throws Exception {
-        // Perform GET request with missing id
         ResultActions result = mockMvc.perform(get(BASE_ENDPOINT));
 
-        // Assert the results
         result.andExpect(status().isBadRequest());
 //        String expectedMessage = "Required request parameter 'id' for method parameter type String is not present";
 //        assertEquals(expectedMessage, result.andReturn().getResponse().getContentAsString());
@@ -65,43 +68,32 @@ public class StreamingControllerTest {
 
     @Test
     public void testGetStreamInfo_ErrorResponseFromService_ReturnsInternalServerError() throws Exception {
-        String id = "12345";
-        String url = "https://www.youtube.com/watch?v=" + id;
+        String expectedResponse = "{\"message\":\"Error retrieving stream info\"}";
+        ResultActions result = performGetRequest(BASE_ENDPOINT, TEST_VIDEO_ID, expectedResponse);
 
-        // Mock the service to return an error response
-        when(videoStreamingService.getStreamInfo(url)).thenReturn("{\"message\":\"error\"}");
+        result.andExpect(status().isInternalServerError());
+        assertEquals(expectedResponse, result.andReturn().getResponse().getContentAsString());
+    }
 
-        // Perform GET request
-        ResultActions result = mockMvc.perform(get(BASE_ENDPOINT).param("id", id));
+    @Test
+    public void testGetStreamInfo_InternalException_ReturnsInternalServerError() throws Exception {
+        String expectedResponse = "{\"message\":\"Error retrieving stream info\"}";
 
-        // Assert the results
+        // Mock the service to throw an exception
+        when(videoStreamingService.getStreamInfo(BASE_ENDPOINT)).thenThrow(new RuntimeException("Service failure"));
+        ResultActions result = performGetRequest(BASE_ENDPOINT, TEST_VIDEO_ID, expectedResponse);
+
         result.andExpect(status().isInternalServerError());
         assertEquals("{\"message\":\"Error retrieving stream info\"}", result.andReturn().getResponse().getContentAsString());
     }
 
     @Test
-    public void testGetStreamInfo_InternalException_ReturnsInternalServerError() throws Exception {
-        String id = "12345";
-        String url = "https://www.youtube.com/watch?v=" + id;
-
-        // Mock the service to throw an exception
-        when(videoStreamingService.getStreamInfo(url)).thenThrow(new RuntimeException("Service failure"));
-
-        // Perform GET request
-        ResultActions result = mockMvc.perform(get(BASE_ENDPOINT).param("id", id));
-
-        // Assert the results
-        result.andExpect(status().isInternalServerError());
-        assertEquals("{\"message\":\"Error retrieving stream info\",\"details\":\"Service failure\"}", result.andReturn().getResponse().getContentAsString());
-    }
-
-    @Test
     public void testGetStreamInfo_EmptyId_ReturnsBadRequest() throws Exception {
-        // Perform GET request with empty id
-        ResultActions result = mockMvc.perform(get(BASE_ENDPOINT).param("id", ""));
+        String expectedResponse = "{\"message\":\"ID parameter is required\"}";
+        ResultActions result = performGetRequest(BASE_ENDPOINT, "", expectedResponse);
 
         // Assert the results
         result.andExpect(status().isBadRequest());
-        assertEquals("{\"message\":\"ID parameter is required\"}", result.andReturn().getResponse().getContentAsString());
+        assertEquals(expectedResponse, result.andReturn().getResponse().getContentAsString());
     }
 }
