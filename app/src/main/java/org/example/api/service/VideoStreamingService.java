@@ -1,12 +1,21 @@
 package org.example.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.schabi.newpipe.extractor.Image;
+import org.schabi.newpipe.extractor.NewPipe;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
+import org.schabi.newpipe.extractor.services.youtube.YoutubeService;
+import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor;
 import org.schabi.newpipe.extractor.stream.*;
+import org.schabi.newpipe.extractor.stream.StreamExtractor.*;
+import org.schabi.newpipe.extractor.StreamingService;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.example.api.utils.ErrorUtils.getError;
 
@@ -82,8 +91,21 @@ public class VideoStreamingService {
      */
     public String getVideoStreams(String url) throws IOException, ExtractionException {
         try {
-            List<VideoStream> videoStreams = StreamInfo.getInfo(url).getVideoStreams();
+            List<VideoStream> videoStreams = StreamInfo.getInfo(url).getVideoOnlyStreams();
             return objectMapper.writeValueAsString(videoStreams);
+        } catch (Exception e) {
+            System.err.println("Video Stream Extraction Error:");
+            e.printStackTrace();
+            return getError(e);
+        }
+    }
+
+
+    public String getDashMpdUrl(String url) throws IOException, ExtractionException {
+        try {
+            String stream = StreamInfo.getInfo(url).getDashMpdUrl();
+            System.out.println("Stream" + stream);
+            return objectMapper.writeValueAsString(stream);
         } catch (Exception e) {
             System.err.println("Video Stream Extraction Error:");
             e.printStackTrace();
@@ -177,6 +199,49 @@ public class VideoStreamingService {
             return objectMapper.writeValueAsString(streamDescription);
         } catch (Exception e) {
             System.err.println("Description Stream Extraction Error:");
+            e.printStackTrace();
+            return getError(e);
+        }
+    }
+
+    /**
+     * Retrieves the video details of a stream for a given URL.
+     *
+     * Extracts and serializes the description, avatars, view count,
+     * like count, dislike count, channel name, channel subscriber count
+     * upload date with the specified stream URL.
+     *
+     * @param url The URL of the stream to extract stream details from
+     * @return A JSON string containing the stream details or an error message
+     * @throws IOException If an I/O error occurs during extraction
+     * @throws ExtractionException If an error occurs during stream information extraction
+     */
+    public String getStreamDetails(String url) throws IOException, ExtractionException {
+        try {
+            Description description = StreamInfo.getInfo(url).getDescription();
+            List<Image> avatars = StreamInfo.getInfo(url).getUploaderAvatars();
+            long viewCount = StreamInfo.getInfo(url).getViewCount();
+            long likeCount = StreamInfo.getInfo(url).getLikeCount();
+            long dislikeCount = StreamInfo.getInfo(url).getDislikeCount();
+            String channelName = StreamInfo.getInfo(url).getUploaderName();
+            long channelSubscriberCount = StreamInfo.getInfo(url).getUploaderSubscriberCount();
+            String uploadDate = StreamInfo.getInfo(url).getTextualUploadDate();
+
+            // Map to build the JSON
+            Map<String, Object> details = new HashMap<>();
+            details.put("description", description);
+            details.put("uploaderAvatars", avatars);
+            details.put("viewCount", viewCount);
+            details.put("likeCount", likeCount);
+            details.put("dislikeCount", dislikeCount);
+            details.put("channelName", channelName);
+            details.put("channelSubscriberCount", channelSubscriberCount);
+            details.put("uploadDate", uploadDate);
+
+            return objectMapper.writeValueAsString(details);
+
+        } catch (Exception e) {
+            System.err.println("Details extraction error");
             e.printStackTrace();
             return getError(e);
         }
