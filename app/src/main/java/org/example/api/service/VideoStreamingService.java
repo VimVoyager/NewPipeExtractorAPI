@@ -218,6 +218,7 @@ public class VideoStreamingService {
      */
     public String getStreamDetails(String url) throws IOException, ExtractionException {
         try {
+            String videoTitle = StreamInfo.getInfo(url).getName();
             Description description = StreamInfo.getInfo(url).getDescription();
             List<Image> avatars = StreamInfo.getInfo(url).getUploaderAvatars();
             long viewCount = StreamInfo.getInfo(url).getViewCount();
@@ -229,6 +230,7 @@ public class VideoStreamingService {
 
             // Map to build the JSON
             Map<String, Object> details = new HashMap<>();
+            details.put("videoTitle", videoTitle);
             details.put("description", description);
             details.put("uploaderAvatars", avatars);
             details.put("viewCount", viewCount);
