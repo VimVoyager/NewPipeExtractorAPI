@@ -1,11 +1,16 @@
 package org.example.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.api.dto.SearchPageDTO;
+import org.example.api.dto.SearchResultDTO;
 import org.example.api.utils.PaginationUtils;
+import org.schabi.newpipe.extractor.ListExtractor;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.search.SearchInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,6 +27,7 @@ import static org.example.api.utils.ErrorUtils.getError;
  */
 @Service
 public class SearchService {
+    private static final Logger logger = LoggerFactory.getLogger(SearchService.class);
     private final ObjectMapper objectMapper;
     private final PaginationUtils paginationUtils;
 
@@ -55,7 +61,8 @@ public class SearchService {
         try {
             StreamingService service = NewPipe.getService(serviceId);
             SearchInfo info = SearchInfo.getInfo(service, service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter));
-            return objectMapper.writeValueAsString(info);
+            SearchResultDTO dto = SearchResultDTO.from(info);
+            return objectMapper.writeValueAsString(dto);
         } catch (Exception e) {
             System.err.println("Search Info Extraction Error:");
             e.printStackTrace();
@@ -83,11 +90,18 @@ public class SearchService {
             try {
                 StreamingService service = NewPipe.getService(serviceId);
                 Page pageInstance = new Page(pageUrl);
-                return SearchInfo.getMoreItems(
+                ListExtractor.InfoItemsPage<?> page = SearchInfo.getMoreItems(
                         service,
                         service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter),
                         pageInstance
                 );
+
+                return SearchPageDTO.from(page);
+//                return SearchInfo.getMoreItems(
+//                        service,
+//                        service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter),
+//                        pageInstance
+//                );
             } catch (Exception e) {
                 throw new RuntimeException("Failed to extract search page", e);
             }
