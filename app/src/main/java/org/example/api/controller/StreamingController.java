@@ -473,4 +473,39 @@ public class StreamingController {
                     ));
         }
     }
+
+    @GetMapping("/related")
+    public ResponseEntity<?> getRelatedStreams(@RequestParam(name = "id") String id) throws Exception {
+        try {
+            logger.info("Retrieving related streams for ID: {}", id);
+
+            // Validate URL
+            if (id == null || id.isEmpty()) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(Map.of("message", "ID parameter is required"));
+            }
+
+            String url = YOUTUBE_URL + id;
+            String relatedStreamsJson = videoStreamingService.getRelatedStreams(url);
+
+            // Check if it's an error response
+            if (relatedStreamsJson.contains("\"message\"")) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Error retrieving related streams");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            }
+
+            return ResponseEntity.ok(relatedStreamsJson);
+        } catch (Exception e) {
+            logger.error("Error related streams for ID: {}", id, e);
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of(
+                            "message", "Error retrieving related streams",
+                            "details", e.getMessage()
+                    ));
+        }
+
+    }
 }

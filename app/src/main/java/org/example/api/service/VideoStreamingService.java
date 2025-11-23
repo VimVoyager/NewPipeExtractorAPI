@@ -1,15 +1,12 @@
 package org.example.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.schabi.newpipe.extractor.Image;
-import org.schabi.newpipe.extractor.NewPipe;
-import org.schabi.newpipe.extractor.ServiceList;
+import org.schabi.newpipe.extractor.*;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeService;
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor;
 import org.schabi.newpipe.extractor.stream.*;
 import org.schabi.newpipe.extractor.stream.StreamExtractor.*;
-import org.schabi.newpipe.extractor.StreamingService;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -244,6 +241,17 @@ public class VideoStreamingService {
 
         } catch (Exception e) {
             System.err.println("Details extraction error");
+            e.printStackTrace();
+            return getError(e);
+        }
+    }
+
+    public String getRelatedStreams(String url) throws IOException, ExtractionException {
+        try {
+            List<InfoItem> relatedItems = StreamInfo.getInfo(url).getRelatedItems();
+            return objectMapper.writeValueAsString(relatedItems);
+        } catch (Exception e) {
+            System.err.println("Related streams extraction error");
             e.printStackTrace();
             return getError(e);
         }
