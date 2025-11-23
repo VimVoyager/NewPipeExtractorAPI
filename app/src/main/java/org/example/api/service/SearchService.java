@@ -27,7 +27,7 @@ import static org.example.api.utils.ErrorUtils.getError;
  */
 @Service
 public class SearchService {
-    private static final Logger logger = LoggerFactory.getLogger(SearchService.class);
+    private static final int YOUTUBE_SERVICE_ID = 0;
     private final ObjectMapper objectMapper;
     private final PaginationUtils paginationUtils;
 
@@ -50,16 +50,15 @@ public class SearchService {
      * Handles potential exceptions and returns either the search
      * results or an error response.
      *
-     * @param serviceId The ID of the streaming service to search
      * @param searchString The query string for the search
      * @param contentFilters List of filters to refine search results
      * @param sortFilter Sorting method for the search results
      * @return A JSON string containing search information or an error message
      * @throws Exception If an error occurs during the search process
      */
-    public String getSearchInfo(int serviceId, String searchString, List<String> contentFilters, String sortFilter) throws Exception {
+    public String getSearchInfo(String searchString, List<String> contentFilters, String sortFilter) throws Exception {
         try {
-            StreamingService service = NewPipe.getService(serviceId);
+            StreamingService service = NewPipe.getService(YOUTUBE_SERVICE_ID);
             SearchInfo info = SearchInfo.getInfo(service, service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter));
             SearchResultDTO dto = SearchResultDTO.from(info);
             return objectMapper.writeValueAsString(dto);
@@ -77,7 +76,6 @@ public class SearchService {
      * based on the initial search parameters and a specific page URL.
      * Supports continued loading of search results across multiple pages.
      *
-     * @param serviceId The ID of the streaming service to search
      * @param searchString The original query string for the search
      * @param contentFilters List of filters to refine search results
      * @param sortFilter Sorting method for the search results
@@ -85,10 +83,10 @@ public class SearchService {
      * @return A JSON string containing the next page of search results or an error message
      * @throws Exception If an error occurs during page retrieval
      */
-    public String getSearchPage(int serviceId, String searchString, List<String> contentFilters, String sortFilter, String pageUrl) throws Exception {
+    public String getSearchPage(String searchString, List<String> contentFilters, String sortFilter, String pageUrl) throws Exception {
         return paginationUtils.handlePaginatedResponse(() -> {
             try {
-                StreamingService service = NewPipe.getService(serviceId);
+                StreamingService service = NewPipe.getService(YOUTUBE_SERVICE_ID);
                 Page pageInstance = new Page(pageUrl);
                 ListExtractor.InfoItemsPage<?> page = SearchInfo.getMoreItems(
                         service,
@@ -97,11 +95,6 @@ public class SearchService {
                 );
 
                 return SearchPageDTO.from(page);
-//                return SearchInfo.getMoreItems(
-//                        service,
-//                        service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter),
-//                        pageInstance
-//                );
             } catch (Exception e) {
                 throw new RuntimeException("Failed to extract search page", e);
             }

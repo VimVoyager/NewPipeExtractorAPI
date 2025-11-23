@@ -37,7 +37,6 @@ public class SearchController {
     /**
      * Handles HTTP GET requests to retrieve search information based on the provided service ID and search string.
      *
-     * @param serviceId      the ID of the service for which to perform the search.
      * @param searchString   the string to use for searching; must not be null or empty.
      * @param sortFilter     an optional parameter to sort the results; can be null.
      * @param contentFilters  an optional comma-separated list of content filters to apply; can be null.
@@ -49,13 +48,12 @@ public class SearchController {
      */
     @GetMapping("/")
     public ResponseEntity<?> getSearchInfo(
-            @RequestParam(name = "serviceId") int serviceId,
             @RequestParam(name = "searchString") String searchString,
             @RequestParam(name = "sortFilter", required = false) String sortFilter,
             @RequestParam(name = "contentFilters", required = false) String contentFilters
     ) throws Exception {
         try {
-            logger.info("Retrieving search info for serviceId: {}, searchString: {}", serviceId, searchString);
+            logger.info("Retrieving search info for searchString: {}", searchString);
 
             if (searchString == null || searchString.isEmpty()) {
                 return ResponseEntity
@@ -68,7 +66,6 @@ public class SearchController {
                     : Collections.emptyList();
 
             String searchInfoJson = searchService.getSearchInfo(
-                    serviceId,
                     searchString,
                     contentFilterList,
                     sortFilter
@@ -82,8 +79,8 @@ public class SearchController {
 
             return ResponseEntity.ok(searchInfoJson);
         } catch (Exception e) {
-            logger.error("Error retrieving search info for serviceId: {}, searchString: {}",
-                    serviceId, searchString, e);
+            logger.error("Error retrieving search info for searchString: {}",
+                    searchString, e);
 
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -97,7 +94,6 @@ public class SearchController {
     /**
      * Handles HTTP GET requests to retrieve a search page based on the provided parameters.
      *
-     * @param serviceId      the ID of the service for which to perform the search.
      * @param searchString   the string to use for searching; must not be null or empty.
      * @param sortFilter     an optional parameter to sort the results; can be null.
      * @param contentFilters  an optional comma-separated list of content filters to apply; can be null.
@@ -111,14 +107,13 @@ public class SearchController {
      */
     @GetMapping("/page")
     public ResponseEntity<?> getSearchPage(
-            @RequestParam(name = "serviceId") int serviceId,
             @RequestParam(name = "searchString") String searchString,
             @RequestParam(name = "sortFilter", required = false) String sortFilter,
             @RequestParam(name = "contentFilters", required = false) String contentFilters,
             @RequestParam(name = "pageUrl") String pageUrl
     ) throws Exception {
         try {
-            logger.info("Retrieving search page for serviceId: {}, searchString: {}, pageUrl: {}", serviceId, searchString, pageUrl);
+            logger.info("Retrieving search page for searchString: {}, pageUrl: {}", searchString, pageUrl);
 
             if (searchString == null || searchString.isEmpty()) {
                 return ResponseEntity
@@ -137,7 +132,6 @@ public class SearchController {
                     : Collections.emptyList();
 
             String searchPageJson = searchService.getSearchPage(
-                    serviceId,
                     searchString,
                     contentFilterList,
                     sortFilter,
@@ -151,8 +145,8 @@ public class SearchController {
             }
             return ResponseEntity.ok(searchPageJson);
         } catch (Exception e) {
-            logger.error("Error retrieving search page for serviceId: {}, searchString: {}, pageUrl: {}",
-                    serviceId, searchString, pageUrl, e);
+            logger.error("Error retrieving search page for searchString: {}, pageUrl: {}",
+                    searchString, pageUrl, e);
 
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)

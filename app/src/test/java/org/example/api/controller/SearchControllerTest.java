@@ -48,7 +48,7 @@ public class SearchControllerTest {
         String searchString = "example";
         String expectedResponse = "{\"results\":\"some search results\"}";
 
-        when(searchService.getSearchInfo(serviceId, searchString, Collections.emptyList(), null)).thenReturn(expectedResponse);
+        when(searchService.getSearchInfo(searchString, Collections.emptyList(), null)).thenReturn(expectedResponse);
 
         // Act
         ResultActions result = performGetRequest(serviceId, searchString, null, null);
@@ -78,7 +78,7 @@ public class SearchControllerTest {
         int serviceId = 1;
         String searchString = "example";
 
-        when(searchService.getSearchInfo(serviceId, searchString, Collections.emptyList(), null)).thenReturn("{\"message\":\"error\"}");
+        when(searchService.getSearchInfo(searchString, Collections.emptyList(), null)).thenReturn("{\"message\":\"error\"}");
 
         // Act
         ResultActions result = performGetRequest(serviceId, searchString, null, null);
@@ -94,7 +94,7 @@ public class SearchControllerTest {
         int serviceId = 1;
         String searchString = "example";
 
-        when(searchService.getSearchInfo(anyInt(), anyString(), anyList(), anyString()))
+        when(searchService.getSearchInfo(anyString(), anyList(), anyString()))
                 .thenThrow(new RuntimeException("Service failure"));
 
         // Act
