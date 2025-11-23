@@ -1,5 +1,7 @@
 package org.example.api.config;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.springframework.context.annotation.Bean;
@@ -9,8 +11,18 @@ import org.springframework.context.annotation.Configuration;
 public class JacksonConfig {
     @Bean
     public ObjectMapper objectMapper() {
-        return new ObjectMapper()
-                .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
-                .configure(SerializationFeature.INDENT_OUTPUT, true);
+        ObjectMapper mapper = new ObjectMapper();
+
+        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+        mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
+
+        mapper.disable(SerializationFeature.FAIL_ON_SELF_REFERENCES);
+        mapper.disable(SerializationFeature.WRITE_SELF_REFERENCES_AS_NULL);
+
+        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        return mapper;
     }
 }
