@@ -1,9 +1,9 @@
 package org.example.api.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.api.dto.SearchPageDTO;
 import org.example.api.dto.SearchResultDTO;
-import org.example.api.utils.PaginationUtils;
+import org.example.api.dto.SearchItemDTO;
+import org.example.api.exception.ExtractionException;
 import org.schabi.newpipe.extractor.ListExtractor;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
@@ -13,91 +13,122 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
-
-import static org.example.api.utils.ErrorUtils.getError;
+import java.util.stream.Collectors;
 
 /**
  * Service for performing and managing search operations across
  * different streaming services using NewPipe extractor.
  *
  * This service provides methods to retrieve initial search results
- * and paginated search results from various streaming platforms,
- * with robust error handling and flexible filtering options.
+ * and paginated search results.
  */
 @Service
 public class SearchService {
+    private static final Logger logger = LoggerFactory.getLogger(SearchService.class);
     private static final int YOUTUBE_SERVICE_ID = 0;
-    private final ObjectMapper objectMapper;
-    private final PaginationUtils paginationUtils;
 
     /**
-     * Constructor to inject dependencies for search operations.
-     *
-     * @param objectMapper The ObjectMapper for JSON processing
-     * @param paginationUtils Utility for handling paginated responses
-     */
-    public SearchService(ObjectMapper objectMapper, PaginationUtils paginationUtils) {
-        this.objectMapper = objectMapper;
-        this.paginationUtils = paginationUtils;
-    }
-
-    /**
-     * Performs an initial search across a specified streaming service.
-     *
-     * Retrieves search results based on the provided service ID,
-     * search string, content filters, and sorting preferences.
-     * Handles potential exceptions and returns either the search
-     * results or an error response.
+     * Performs an initial search and returns deduplicated results.
      *
      * @param searchString The query string for the search
      * @param contentFilters List of filters to refine search results
      * @param sortFilter Sorting method for the search results
-     * @return A JSON string containing search information or an error message
-     * @throws Exception If an error occurs during the search process
+     * @return SearchResultDTO containing search results
+     * @throws ExtractionException if search extraction fails
      */
-    public String getSearchInfo(String searchString, List<String> contentFilters, String sortFilter) throws Exception {
+    public SearchResultDTO getSearchInfo(
+            String searchString,
+            List<String> contentFilters,
+            String sortFilter
+    ) {
         try {
+            logger.info("Performing search for: {}", searchString);
+
             StreamingService service = NewPipe.getService(YOUTUBE_SERVICE_ID);
-            SearchInfo info = SearchInfo.getInfo(service, service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter));
+            SearchInfo info = SearchInfo.getInfo(
+                    service,
+                    service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter)
+            );
+
             SearchResultDTO dto = SearchResultDTO.from(info);
-            return objectMapper.writeValueAsString(dto);
+
+            // Deduplicate items by URL
+            List<SearchItemDTO> uniqueItems = deduplicateByUrl(dto.getItems());
+            dto.setItems(uniqueItems);
+
+            logger.info("Search completed. Found {} unique results out of {} total",
+                    uniqueItems.size(), dto.getItems().size());
+
+            return dto;
         } catch (Exception e) {
-            System.err.println("Search Info Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
+            logger.error("Failed to perform search for: {}", searchString, e);
+            throw new ExtractionException("Failed to retrieve search results", e);
         }
     }
 
     /**
-     * Retrieves the next page of search results for a given search.
-     *
-     * Utilizes pagination utilities to fetch additional search results
-     * based on the initial search parameters and a specific page URL.
-     * Supports continued loading of search results across multiple pages.
+     * Retrieves the next page of search results with deduplication.
      *
      * @param searchString The original query string for the search
      * @param contentFilters List of filters to refine search results
      * @param sortFilter Sorting method for the search results
      * @param pageUrl URL representing the specific page of results to retrieve
-     * @return A JSON string containing the next page of search results or an error message
-     * @throws Exception If an error occurs during page retrieval
+     * @return SearchPageDTO containing the next page of search results
+     * @throws ExtractionException if page extraction fails
      */
-    public String getSearchPage(String searchString, List<String> contentFilters, String sortFilter, String pageUrl) throws Exception {
-        return paginationUtils.handlePaginatedResponse(() -> {
-            try {
-                StreamingService service = NewPipe.getService(YOUTUBE_SERVICE_ID);
-                Page pageInstance = new Page(pageUrl);
-                ListExtractor.InfoItemsPage<?> page = SearchInfo.getMoreItems(
-                        service,
-                        service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter),
-                        pageInstance
-                );
+    public SearchPageDTO getSearchPage(
+            String searchString,
+            List<String> contentFilters,
+            String sortFilter,
+            String pageUrl
+    ) {
+        try {
+            logger.info("Retrieving search page for: {} with pageUrl: {}", searchString, pageUrl);
 
-                return SearchPageDTO.from(page);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to extract search page", e);
-            }
-        });
+            StreamingService service = NewPipe.getService(YOUTUBE_SERVICE_ID);
+            Page pageInstance = new Page(pageUrl);
+
+            ListExtractor.InfoItemsPage<?> page = SearchInfo.getMoreItems(
+                    service,
+                    service.getSearchQHFactory().fromQuery(searchString, contentFilters, sortFilter),
+                    pageInstance
+            );
+
+            SearchPageDTO dto = SearchPageDTO.from(page);
+
+            // Deduplicate items by URL
+            List<SearchItemDTO> uniqueItems = deduplicateByUrl(dto.getItems());
+            dto.setItems(uniqueItems);
+            dto.setItemCount(uniqueItems.size());
+
+            logger.info("Retrieved page with {} unique results out of {} total",
+                    uniqueItems.size(), page.getItems().size());
+
+            return dto;
+        } catch (Exception e) {
+            logger.error("Failed to retrieve search page for: {} with pageUrl: {}", searchString, pageUrl, e);
+            throw new ExtractionException("Failed to retrieve search page", e);
+        }
+    }
+
+    /**
+     * Deduplicates search items by URL, keeping the first occurrence.
+     *
+     * @param items List of search items to deduplicate
+     * @return Deduplicated list of search items
+     */
+    private List<SearchItemDTO> deduplicateByUrl(List<SearchItemDTO> items) {
+        return items.stream()
+                .collect(Collectors.toMap(
+                        SearchItemDTO::getUrl,
+                        item -> item,
+                        (existing, replacement) -> existing, // Keep first occurrence
+                        LinkedHashMap::new // Preserve order
+                ))
+                .values()
+                .stream()
+                .collect(Collectors.toList());
     }
 }
