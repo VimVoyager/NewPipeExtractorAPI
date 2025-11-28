@@ -1,201 +1,414 @@
 package org.example.api.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.api.exception.ExtractionException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.MockedStatic;
+import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.stream.*;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-public class VideoStreamingServiceTest {
-    @Mock
-    private ObjectMapper objectMapper;
+/**
+ * Comprehensive test suite for VideoStreamingService.
+ * Tests all stream extraction methods and error handling.
+ */
+@DisplayName("VideoStreamingService Tests")
+class VideoStreamingServiceTest {
+
     private VideoStreamingService videoStreamingService;
-    private StreamInfo mockStreamInfo;
-    private static final String TEST_URL = "https://example.com/video";
+    private static final String TEST_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 
     @BeforeEach
-    void setup() {
-        MockitoAnnotations.openMocks(this);
-        videoStreamingService = new VideoStreamingService(objectMapper);
-        mockStreamInfo = mock(StreamInfo.class);
+    void setUp() {
+        videoStreamingService = new VideoStreamingService();
     }
 
-    @Test
-    public void testGetStreamInfo() throws Exception {
-        // Arrange
-        String expectedJsonResponse = "{\"id\":\"test\"}";
+    @Nested
+    @DisplayName("Stream Info Tests")
+    class StreamInfoTests {
 
-        try (var mockedStatic = mockStatic(StreamInfo.class)) {
-            mockedStatic.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+        @Test
+        @DisplayName("Should return stream info successfully")
+        void testGetStreamInfo_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
 
-            // Mock JSON serialization
-            when(objectMapper.writeValueAsString(mockStreamInfo)).thenReturn(expectedJsonResponse);
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
 
-            // Act
-            String result = videoStreamingService.getStreamInfo(TEST_URL);
+                // Act
+                StreamInfo result = videoStreamingService.getStreamInfo(TEST_URL);
 
-            // Assert
-            assertEquals(expectedJsonResponse, result);
-            verify(objectMapper).writeValueAsString(mockStreamInfo);
+                // Assert
+                assertNotNull(result);
+                assertEquals("Test Video", result.getName());
+            }
+        }
+
+        @Test
+        @DisplayName("Should throw ExtractionException when extraction fails")
+        void testGetStreamInfo_ThrowsExtractionException() {
+            // Arrange
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL))
+                        .thenThrow(new RuntimeException("Extraction failed"));
+
+                // Act & Assert
+                ExtractionException exception = assertThrows(ExtractionException.class, () ->
+                        videoStreamingService.getStreamInfo(TEST_URL)
+                );
+
+                assertTrue(exception.getMessage().contains("Failed to retrieve stream information"));
+                assertNotNull(exception.getCause());
+            }
         }
     }
 
-    @Test
-    public void testGetAudioStreams() throws Exception {
-        // Arrange
-        AudioStream mockAudioStream = mock(AudioStream.class);
-        List<AudioStream> mockAudioStreams = Arrays.asList(mockAudioStream);
+    @Nested
+    @DisplayName("Audio Stream Tests")
+    class AudioStreamTests {
 
-        // Assuming that StreamInfo is a class and has a method to get audio streams
-        when(mockStreamInfo.getAudioStreams()).thenReturn(mockAudioStreams);
+        @Test
+        @DisplayName("Should return audio streams successfully")
+        void testGetAudioStreams_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            List<AudioStream> mockAudioStreams = createMockAudioStreams();
+            when(mockStreamInfo.getAudioStreams()).thenReturn(mockAudioStreams);
 
-        String expectedJsonResponse = "[{\"id\":\"test\"}]";
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
 
-        try (var mockedStatic = mockStatic(StreamInfo.class)) {
-            mockedStatic.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+                // Act
+                List<AudioStream> result = videoStreamingService.getAudioStreams(TEST_URL);
 
-            // Mock JSON serialization
-            when(objectMapper.writeValueAsString(mockAudioStreams)).thenReturn(expectedJsonResponse);
+                // Assert
+                assertNotNull(result);
+                assertEquals(2, result.size());
+            }
+        }
 
-            // Act
-            String result = videoStreamingService.getAudioStreams(TEST_URL); // Correct method called
+        @Test
+        @DisplayName("Should return empty list when no audio streams available")
+        void testGetAudioStreams_EmptyList() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            when(mockStreamInfo.getAudioStreams()).thenReturn(Collections.emptyList());
 
-            // Assert
-            assertEquals(expectedJsonResponse, result);
-            verify(objectMapper).writeValueAsString(mockAudioStreams);
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+
+                // Act
+                List<AudioStream> result = videoStreamingService.getAudioStreams(TEST_URL);
+
+                // Assert
+                assertNotNull(result);
+                assertTrue(result.isEmpty());
+            }
+        }
+
+        @Test
+        @DisplayName("Should throw ExtractionException when extraction fails")
+        void testGetAudioStreams_ThrowsExtractionException() {
+            // Arrange
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL))
+                        .thenThrow(new RuntimeException("Failed"));
+
+                // Act & Assert
+                ExtractionException exception = assertThrows(ExtractionException.class, () ->
+                        videoStreamingService.getAudioStreams(TEST_URL)
+                );
+
+                assertTrue(exception.getMessage().contains("Failed to retrieve audio streams"));
+            }
         }
     }
 
-    @Test
-    public void testGetVideoStreams() throws Exception {
-        // Arrange
-        VideoStream mockVideoStream = mock(VideoStream.class);
-        List<VideoStream> mockVideoStreams = Arrays.asList(mockVideoStream);
+    @Nested
+    @DisplayName("Video Stream Tests")
+    class VideoStreamTests {
 
-        when(mockStreamInfo.getVideoStreams()).thenReturn(mockVideoStreams);
+        @Test
+        @DisplayName("Should return video streams successfully")
+        void testGetVideoStreams_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            List<VideoStream> mockVideoStreams = createMockVideoStreams();
+            when(mockStreamInfo.getVideoOnlyStreams()).thenReturn(mockVideoStreams);
 
-        String expectedJsonResponse = "[{\"id\":\"test\"}]";
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
 
-        try (var mockedStatic = mockStatic(StreamInfo.class)) {
-            mockedStatic.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+                // Act
+                List<VideoStream> result = videoStreamingService.getVideoStreams(TEST_URL);
 
-            // Mock JSON serialization
-            when(objectMapper.writeValueAsString(mockVideoStreams)).thenReturn(expectedJsonResponse);
+                // Assert
+                assertNotNull(result);
+                assertEquals(2, result.size());
+            }
+        }
 
-            // Act
-            String result = videoStreamingService.getVideoStreams(TEST_URL);
+        @Test
+        @DisplayName("Should throw ExtractionException when extraction fails")
+        void testGetVideoStreams_ThrowsExtractionException() {
+            // Arrange
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL))
+                        .thenThrow(new RuntimeException("Failed"));
 
-            // Assert
-            assertEquals(expectedJsonResponse, result);
-            verify(objectMapper).writeValueAsString(mockVideoStreams);
+                // Act & Assert
+                ExtractionException exception = assertThrows(ExtractionException.class, () ->
+                        videoStreamingService.getVideoStreams(TEST_URL)
+                );
+
+                assertTrue(exception.getMessage().contains("Failed to retrieve video streams"));
+            }
         }
     }
 
-    @Test
-    public void testGetSubtitles() throws Exception {
-        // Arrange
-        SubtitlesStream mockSubtitles = mock(SubtitlesStream.class);
-        List<SubtitlesStream> mockSubtitlesStreams = Arrays.asList(mockSubtitles);
+    @Nested
+    @DisplayName("DASH MPD Tests")
+    class DashMpdTests {
 
-        when(mockStreamInfo.getSubtitles()).thenReturn(mockSubtitlesStreams);
+        @Test
+        @DisplayName("Should return DASH MPD URL successfully")
+        void testGetDashMpdUrl_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            String dashUrl = "https://youtube.com/dash/manifest.mpd";
+            when(mockStreamInfo.getDashMpdUrl()).thenReturn(dashUrl);
 
-        String expectedJsonResponse = "[{\"id\":\"test\"}]";
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
 
-        try (var mockedStatic = mockStatic(StreamInfo.class)) {
-            mockedStatic.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+                // Act
+                String result = videoStreamingService.getDashMpdUrl(TEST_URL);
 
-            // Mock JSON serialization
-            when(objectMapper.writeValueAsString(mockSubtitlesStreams)).thenReturn(expectedJsonResponse);
+                // Assert
+                assertEquals(dashUrl, result);
+            }
+        }
 
-            // Act
-            String result = videoStreamingService.getSubtitleStreams(TEST_URL);
+        @Test
+        @DisplayName("Should handle null DASH MPD URL")
+        void testGetDashMpdUrl_Null() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            when(mockStreamInfo.getDashMpdUrl()).thenReturn(null);
 
-            // Assert
-            assertEquals(expectedJsonResponse, result);
-            verify(objectMapper).writeValueAsString(mockSubtitlesStreams);
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+
+                // Act
+                String result = videoStreamingService.getDashMpdUrl(TEST_URL);
+
+                // Assert
+                assertNull(result);
+            }
         }
     }
 
-    @Test
-    public void testGetStreamSegments() throws Exception {
-        // Arrange
-        StreamSegment mockStreamSegment = mock(StreamSegment.class);
-        List<StreamSegment> mockStreamSegments = Arrays.asList(mockStreamSegment);
+    @Nested
+    @DisplayName("Subtitle Tests")
+    class SubtitleTests {
 
-        when(mockStreamInfo.getStreamSegments()).thenReturn(mockStreamSegments);
+        @Test
+        @DisplayName("Should return subtitle streams successfully")
+        void testGetSubtitleStreams_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            List<SubtitlesStream> mockSubtitles = createMockSubtitles();
+            when(mockStreamInfo.getSubtitles()).thenReturn(mockSubtitles);
 
-        String expectedJsonResponse = "[{\"id\":\"test\"}]";
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
 
-        try (var mockedStatic = mockStatic(StreamInfo.class)) {
-            mockedStatic.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+                // Act
+                List<SubtitlesStream> result = videoStreamingService.getSubtitleStreams(TEST_URL);
 
-            // Mock JSON serialization
-            when(objectMapper.writeValueAsString(mockStreamSegments)).thenReturn(expectedJsonResponse);
-
-            // Act
-            String result = videoStreamingService.getStreamSegments(TEST_URL);
-
-            // Assert
-            assertEquals(expectedJsonResponse, result);
-            verify(objectMapper).writeValueAsString(mockStreamSegments);
+                // Assert
+                assertNotNull(result);
+                assertEquals(2, result.size());
+            }
         }
     }
 
-    @Test
-    public void testGetPreviewStreams() throws Exception {
-        // Arrange
-        Frameset mockPreviewFrame = mock(Frameset.class);
-        List<Frameset> mockPreviewFrames = Arrays.asList(mockPreviewFrame);
+    @Nested
+    @DisplayName("Stream Segment Tests")
+    class StreamSegmentTests {
 
-        when(mockStreamInfo.getPreviewFrames()).thenReturn(mockPreviewFrames);
+        @Test
+        @DisplayName("Should return stream segments successfully")
+        void testGetStreamSegments_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            List<StreamSegment> mockSegments = createMockSegments();
+            when(mockStreamInfo.getStreamSegments()).thenReturn(mockSegments);
 
-        String expectedJsonResponse = "[{\"id\":\"test\"}]";
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
 
-        try (var mockedStatic = mockStatic(StreamInfo.class)) {
-            mockedStatic.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+                // Act
+                List<StreamSegment> result = videoStreamingService.getStreamSegments(TEST_URL);
 
-            // Mock JSON serialization
-            when(objectMapper.writeValueAsString(mockPreviewFrames)).thenReturn(expectedJsonResponse);
-
-            // Act
-            String result = videoStreamingService.getPreviewFrames(TEST_URL);
-
-            // Assert
-            assertEquals(expectedJsonResponse, result);
-            verify(objectMapper).writeValueAsString(mockPreviewFrames);
+                // Assert
+                assertNotNull(result);
+                assertEquals(3, result.size());
+            }
         }
     }
 
-    @Test
-    public void testGetStreamDescription() throws Exception {
-        // Arrange
-        Description mockStreamDescription = mock(Description.class);
+    @Nested
+    @DisplayName("Preview Frame Tests")
+    class PreviewFrameTests {
 
-        when(mockStreamInfo.getDescription()).thenReturn(mockStreamDescription);
+        @Test
+        @DisplayName("Should return preview frames successfully")
+        void testGetPreviewFrames_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            List<Frameset> mockFrames = createMockFramesets();
+            when(mockStreamInfo.getPreviewFrames()).thenReturn(mockFrames);
 
-        String expectedJsonResponse = "[{\"id\":\"test\"}]";
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
 
-        try (var mockedStatic = mockStatic(StreamInfo.class)) {
-            mockedStatic.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+                // Act
+                List<Frameset> result = videoStreamingService.getPreviewFrames(TEST_URL);
 
-            // Mock JSON serialization
-            when(objectMapper.writeValueAsString(mockStreamDescription)).thenReturn(expectedJsonResponse);
-
-            // Act
-            String result = videoStreamingService.getStreamDescription(TEST_URL);
-
-            // Assert
-            assertEquals(expectedJsonResponse, result);
-            verify(objectMapper).writeValueAsString(mockStreamDescription);
+                // Assert
+                assertNotNull(result);
+                assertEquals(1, result.size());
+            }
         }
+    }
+
+    @Nested
+    @DisplayName("Description Tests")
+    class DescriptionTests {
+
+        @Test
+        @DisplayName("Should return description successfully")
+        void testGetStreamDescription_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            Description mockDescription = createMockDescription();
+            when(mockStreamInfo.getDescription()).thenReturn(mockDescription);
+
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+
+                // Act
+                Description result = videoStreamingService.getStreamDescription(TEST_URL);
+
+                // Assert
+                assertNotNull(result);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Related Streams Tests")
+    class RelatedStreamsTests {
+
+        @Test
+        @DisplayName("Should return related streams successfully")
+        void testGetRelatedStreams_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            List<InfoItem> mockRelated = createMockRelatedItems();
+            when(mockStreamInfo.getRelatedItems()).thenReturn(mockRelated);
+
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+
+                // Act
+                List<InfoItem> result = videoStreamingService.getRelatedStreams(TEST_URL);
+
+                // Assert
+                assertNotNull(result);
+                assertEquals(5, result.size());
+            }
+        }
+
+        @Test
+        @DisplayName("Should return empty list when no related streams")
+        void testGetRelatedStreams_EmptyList() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            when(mockStreamInfo.getRelatedItems()).thenReturn(Collections.emptyList());
+
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+
+                // Act
+                List<InfoItem> result = videoStreamingService.getRelatedStreams(TEST_URL);
+
+                // Assert
+                assertNotNull(result);
+                assertTrue(result.isEmpty());
+            }
+        }
+    }
+
+    // Helper methods to create mock objects
+    private StreamInfo createMockStreamInfo() {
+        StreamInfo mockInfo = mock(StreamInfo.class);
+        when(mockInfo.getName()).thenReturn("Test Video");
+        when(mockInfo.getUrl()).thenReturn(TEST_URL);
+        return mockInfo;
+    }
+
+    private List<AudioStream> createMockAudioStreams() {
+        AudioStream stream1 = mock(AudioStream.class);
+        AudioStream stream2 = mock(AudioStream.class);
+        return Arrays.asList(stream1, stream2);
+    }
+
+    private List<VideoStream> createMockVideoStreams() {
+        VideoStream stream1 = mock(VideoStream.class);
+        VideoStream stream2 = mock(VideoStream.class);
+        return Arrays.asList(stream1, stream2);
+    }
+
+    private List<SubtitlesStream> createMockSubtitles() {
+        SubtitlesStream sub1 = mock(SubtitlesStream.class);
+        SubtitlesStream sub2 = mock(SubtitlesStream.class);
+        return Arrays.asList(sub1, sub2);
+    }
+
+    private List<StreamSegment> createMockSegments() {
+        StreamSegment seg1 = mock(StreamSegment.class);
+        StreamSegment seg2 = mock(StreamSegment.class);
+        StreamSegment seg3 = mock(StreamSegment.class);
+        return Arrays.asList(seg1, seg2, seg3);
+    }
+
+    private List<Frameset> createMockFramesets() {
+        Frameset frameset = mock(Frameset.class);
+        return Collections.singletonList(frameset);
+    }
+
+    private Description createMockDescription() {
+        return mock(Description.class);
+    }
+
+    private List<InfoItem> createMockRelatedItems() {
+        return Arrays.asList(
+                mock(InfoItem.class),
+                mock(InfoItem.class),
+                mock(InfoItem.class),
+                mock(InfoItem.class),
+                mock(InfoItem.class)
+        );
     }
 }
-
-
