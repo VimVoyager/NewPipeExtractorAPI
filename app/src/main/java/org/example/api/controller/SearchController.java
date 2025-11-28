@@ -1,22 +1,24 @@
 package org.example.api.controller;
 
+import org.example.api.dto.SearchPageDTO;
+import org.example.api.dto.SearchResultDTO;
 import org.example.api.service.SearchService;
+import org.example.api.utils.ValidationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
- * REST controller for handling search-related API requests for YouTube information.
- * This class provides endpoints for searching videos based on various parameters
- * such as service ID and search string. All endpoints are prefixed with "/api/v1/search".
+ * REST controller for handling search-related API requests.
+ * All endpoints are prefixed with "/api/v1/search".
  */
 @RestController
 @RequestMapping("/api/v1/search")
@@ -24,136 +26,82 @@ public class SearchController {
     private static final Logger logger = LoggerFactory.getLogger(SearchController.class);
     private final SearchService searchService;
 
-    /**
-     * Constructs a new SearchController with the specified SearchService.
-     *
-     * @param searchService an instance of SearchService used to handle search operations.
-     */
-    @Autowired
     public SearchController(SearchService searchService) {
         this.searchService = searchService;
     }
 
     /**
-     * Handles HTTP GET requests to retrieve search information based on the provided service ID and search string.
+     * Performs a search and returns the initial results.
      *
-     * @param searchString   the string to use for searching; must not be null or empty.
-     * @param sortFilter     an optional parameter to sort the results; can be null.
-     * @param contentFilters  an optional comma-separated list of content filters to apply; can be null.
-     * @return a ResponseEntity containing either:
-     *         - A success response with the search information in JSON format (HTTP 200 OK),
-     *         - A bad request response if the search string is missing (HTTP 400 Bad Request),
-     *         - An error response if an internal error occurs (HTTP 500 Internal Server Error).
-     * @throws Exception if an unexpected error occurs while retrieving search information.
+     * @param searchString The search query
+     * @param sortFilter Optional sort filter
+     * @param contentFilters Optional comma-separated content filters
+     * @return SearchResultDTO with search results
      */
-    @GetMapping("/")
-    public ResponseEntity<?> getSearchInfo(
+    @GetMapping
+    public ResponseEntity<SearchResultDTO> search(
             @RequestParam(name = "searchString") String searchString,
             @RequestParam(name = "sortFilter", required = false) String sortFilter,
             @RequestParam(name = "contentFilters", required = false) String contentFilters
-    ) throws Exception {
-        try {
-            logger.info("Retrieving search info for searchString: {}", searchString);
+    ) {
+        logger.info("Search request received for: {}", searchString);
 
-            if (searchString == null || searchString.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "Search string is required"));
-            }
+        ValidationUtils.requireNonEmpty(searchString, "searchString");
 
-            List<String> contentFilterList = contentFilters != null && !contentFilters.isEmpty()
-                    ? Arrays.asList(contentFilters.split(","))
-                    : Collections.emptyList();
+        List<String> contentFilterList = parseContentFilters(contentFilters);
 
-            String searchInfoJson = searchService.getSearchInfo(
-                    searchString,
-                    contentFilterList,
-                    sortFilter
-            );
+        SearchResultDTO results = searchService.getSearchInfo(
+                searchString,
+                contentFilterList,
+                sortFilter
+        );
 
-            if (searchInfoJson == null || searchInfoJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving search info");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(searchInfoJson);
-        } catch (Exception e) {
-            logger.error("Error retrieving search info for searchString: {}",
-                    searchString, e);
-
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving search info",
-                            "details", e.getMessage()
-                    ));
-        }
+        return ResponseEntity.ok(results);
     }
 
     /**
-     * Handles HTTP GET requests to retrieve a search page based on the provided parameters.
+     * Retrieves a specific page of search results.
      *
-     * @param searchString   the string to use for searching; must not be null or empty.
-     * @param sortFilter     an optional parameter to sort the results; can be null.
-     * @param contentFilters  an optional comma-separated list of content filters to apply; can be null.
-     * @param pageUrl       the URL of the page to retrieve; must not be null or empty.
-     * @return a ResponseEntity containing either:
-     *         - A success response with the search page information in JSON format (HTTP 200 OK),
-     *         - A bad request response if the search string or page URL is missing (HTTP 400 Bad Request),
-     *         - An error response if an internal error occurs (HTTP 500 Internal Server
-     *         - An error response if an internal error occurs (HTTP 500 Internal Server Error).
-     * @throws Exception if an unexpected error occurs while retrieving the search page.
+     * @param searchString The search query
+     * @param pageUrl The page URL for pagination
+     * @param sortFilter Optional sort filter
+     * @param contentFilters Optional comma-separated content filters
+     * @return SearchPageDTO with the requested page of results
      */
     @GetMapping("/page")
-    public ResponseEntity<?> getSearchPage(
+    public ResponseEntity<SearchPageDTO> searchPage(
             @RequestParam(name = "searchString") String searchString,
+            @RequestParam(name = "pageUrl") String pageUrl,
             @RequestParam(name = "sortFilter", required = false) String sortFilter,
-            @RequestParam(name = "contentFilters", required = false) String contentFilters,
-            @RequestParam(name = "pageUrl") String pageUrl
-    ) throws Exception {
-        try {
-            logger.info("Retrieving search page for searchString: {}, pageUrl: {}", searchString, pageUrl);
+            @RequestParam(name = "contentFilters", required = false) String contentFilters
+    ) {
+        logger.info("Search page request for: {} with pageUrl: {}", searchString, pageUrl);
 
-            if (searchString == null || searchString.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "Search string is required"));
-            }
+        ValidationUtils.requireNonEmpty(searchString, "searchString");
+        ValidationUtils.requireNonEmpty(pageUrl, "pageUrl");
 
-            if (pageUrl == null || pageUrl.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "Page URL is required"));
-            }
+        List<String> contentFilterList = parseContentFilters(contentFilters);
 
-            List<String> contentFilterList = contentFilters != null && !contentFilters.isEmpty()
-                    ? Arrays.asList(contentFilters.split(","))
-                    : Collections.emptyList();
+        SearchPageDTO page = searchService.getSearchPage(
+                searchString,
+                contentFilterList,
+                sortFilter,
+                pageUrl
+        );
 
-            String searchPageJson = searchService.getSearchPage(
-                    searchString,
-                    contentFilterList,
-                    sortFilter,
-                    pageUrl
-            );
+        return ResponseEntity.ok(page);
+    }
 
-            if (searchPageJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving search page");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-            return ResponseEntity.ok(searchPageJson);
-        } catch (Exception e) {
-            logger.error("Error retrieving search page for searchString: {}, pageUrl: {}",
-                    searchString, pageUrl, e);
-
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving search page",
-                            "details", e.getMessage()
-                    ));
+    /**
+     * Parses comma-separated content filters into a list.
+     *
+     * @param contentFilters Comma-separated filter string
+     * @return List of filter strings, or empty list if null/empty
+     */
+    private List<String> parseContentFilters(String contentFilters) {
+        if (contentFilters == null || contentFilters.trim().isEmpty()) {
+            return Collections.emptyList();
         }
+        return Arrays.asList(contentFilters.split(","));
     }
 }
