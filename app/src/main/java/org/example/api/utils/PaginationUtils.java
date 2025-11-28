@@ -1,11 +1,11 @@
 package org.example.api.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.api.exception.ExtractionException;
 import org.springframework.stereotype.Component;
 
 import java.util.function.Supplier;
 
-import static org.example.api.utils.ErrorUtils.getError;
 
 /**
  * Utility class for handling paginated API responses.
@@ -17,7 +17,6 @@ import static org.example.api.utils.ErrorUtils.getError;
  */
 @Component
 public class PaginationUtils {
-    private final ObjectMapper objectMapper;
     private final SerializationUtils serializationUtils;
 
     /**
@@ -27,7 +26,6 @@ public class PaginationUtils {
      * @param serializationUtils Utility for safe object serialization
      */
     public PaginationUtils(ObjectMapper objectMapper, SerializationUtils serializationUtils) {
-        this.objectMapper = objectMapper;
         this.serializationUtils = serializationUtils;
     }
 
@@ -47,9 +45,7 @@ public class PaginationUtils {
             Object info = infoExtractor.get();
             return serializationUtils.safeSerialize(info);
         } catch (Exception e) {
-            System.err.println("Pagination Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
+            throw new ExtractionException("Failed to extract page", e);
         }
     }
 }
