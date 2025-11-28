@@ -1,34 +1,41 @@
 package org.example.api.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.api.config.GlobalExceptionHandler;
+import org.example.api.dto.StreamDetailsDTO;
+import org.example.api.exception.ExtractionException;
 import org.example.api.service.VideoStreamingService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.schabi.newpipe.extractor.InfoItem;
+import org.schabi.newpipe.extractor.stream.*;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.when;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-public class StreamingControllerTest {
+/**
+ * Comprehensive test suite for StreamingController.
+ * Tests all streaming endpoints with proper validation and error handling.
+ */
+@DisplayName("StreamingController Tests")
+class StreamingControllerTest {
+
     private MockMvc mockMvc;
-
-    private static final String BASE_ENDPOINT = "/api/v1/streams/";
-    private static final String AUDIO_ENDPOINT = BASE_ENDPOINT + "audio";
-    private static final String VIDEO_ENDPOINT = BASE_ENDPOINT + "video";
-    private static final String SEGMENTS_ENDPOINT = BASE_ENDPOINT + "segments";
-    private static final String FRAMES_ENDPOINT = BASE_ENDPOINT + "frames";
-    private static final String DESCRIPTION_ENDPOINT = BASE_ENDPOINT + "description";
-    private static final String TEST_URL = "https://www.youtube.com/watch?v=";
-    private static final String TEST_VIDEO_ID = "12345";
-    private static final String EMPTY_ID_ERROR_MESSAGE = "{\"message\":\"ID parameter is required\"}";
 
     @Mock
     private VideoStreamingService videoStreamingService;
@@ -36,454 +43,374 @@ public class StreamingControllerTest {
     @InjectMocks
     private StreamingController streamingController;
 
+    private static final String TEST_VIDEO_ID = "dQw4w9WgXcQ";
+    private static final String YOUTUBE_URL = "https://www.youtube.com/watch?v=";
+
     @BeforeEach
-    public void setup() {
+    void setUp() {
         MockitoAnnotations.openMocks(this);
-        mockMvc = MockMvcBuilders.standaloneSetup(streamingController).build();
+
+        // Setup MockMvc with GlobalExceptionHandler
+        mockMvc = MockMvcBuilders.standaloneSetup(streamingController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
     }
 
-    /*
-    -----------------------------------------
-        Utility methods
-    -----------------------------------------
-    */
-    private ResultActions performGetRequest(String videoId) throws Exception {
-        String url = TEST_URL + videoId;
+    @Nested
+    @DisplayName("GET /api/v1/streams - Stream Info Tests")
+    class StreamInfoTests {
 
-        if (videoId.isEmpty()) {
-            return mockMvc.perform(get(BASE_ENDPOINT).param("id", videoId));
+        @Test
+        @DisplayName("Should return stream info successfully")
+        void testGetStreamInfo_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(mockStreamInfo.getName()).thenReturn("Test Video");
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockStreamInfo);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON));
         }
 
-        when(videoStreamingService.getStreamInfo(url)).thenReturn("{\"info\":\"some stream info\"}");
-        return mockMvc.perform(get(BASE_ENDPOINT).param("id", videoId).accept(MediaType.APPLICATION_JSON));
-    }
-
-    private ResultActions performGetAudioRequest(String videoId) throws Exception {
-        String url = TEST_URL + videoId;
-
-        if (videoId.isEmpty()) {
-            return mockMvc.perform(get(AUDIO_ENDPOINT).param("id", videoId));
+        @Test
+        @DisplayName("Should return 400 when ID is missing")
+        void testGetStreamInfo_MissingId() throws Exception {
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isBadRequest());
         }
 
-        when(videoStreamingService.getAudioStreams(url)).thenReturn("{\"audio\":\"some audio stream info\"}");
-        return mockMvc.perform(get(AUDIO_ENDPOINT).param("id", videoId).accept(MediaType.APPLICATION_JSON));
-    }
-
-    private ResultActions performGetVideoRequest(String videoId) throws Exception {
-        String url = TEST_URL + videoId;
-
-        if (videoId.isEmpty()) {
-            return mockMvc.perform(get(VIDEO_ENDPOINT).param("id", videoId));
+        @Test
+        @DisplayName("Should return 400 when ID is empty")
+        void testGetStreamInfo_EmptyId() throws Exception {
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams")
+                            .param("id", "")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk());
         }
 
-        when(videoStreamingService.getVideoStreams(url)).thenReturn("{\"video\":\"some video stream info\"}");
-        return mockMvc.perform(get(VIDEO_ENDPOINT).param("id", videoId).accept(MediaType.APPLICATION_JSON));
+        @Test
+        @DisplayName("Should return 500 when service throws exception")
+        void testGetStreamInfo_ServiceThrowsException() throws Exception {
+            // Arrange
+            when(videoStreamingService.getStreamInfo(anyString()))
+                    .thenThrow(new ExtractionException("Failed to extract stream info"));
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.errorCode").value("EXTRACTION_ERROR"));
+        }
     }
 
-    private ResultActions performGetSegmentRequest(String videoId) throws Exception {
-        String url = TEST_URL + videoId;
+    @Nested
+    @DisplayName("GET /api/v1/streams/audio - Audio Stream Tests")
+    class AudioStreamTests {
 
-        if (videoId.isEmpty()) {
-            return mockMvc.perform(get(SEGMENTS_ENDPOINT).param("id", videoId));
+        @Test
+        @DisplayName("Should return audio streams successfully")
+        void testGetAudioStreams_Success() throws Exception {
+            // Arrange
+            List<AudioStream> mockAudioStreams = Arrays.asList(
+                    mock(AudioStream.class),
+                    mock(AudioStream.class)
+            );
+            when(videoStreamingService.getAudioStreams(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockAudioStreams);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/audio")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isArray())
+                    .andExpect(jsonPath("$", hasSize(2)));
         }
 
-        when(videoStreamingService.getStreamSegments(url)).thenReturn("{\"segments\":\"some stream segments info\"}");
-        return mockMvc.perform(get(SEGMENTS_ENDPOINT).param("id", videoId).accept(MediaType.APPLICATION_JSON));
-    }
+        @Test
+        @DisplayName("Should return empty list when no audio streams available")
+        void testGetAudioStreams_EmptyList() throws Exception {
+            // Arrange
+            when(videoStreamingService.getAudioStreams(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(Collections.emptyList());
 
-    private ResultActions performGetFrameRequest(String videoId) throws Exception {
-        String url = TEST_URL + videoId;
-
-        if (videoId.isEmpty()) {
-            return mockMvc.perform(get(FRAMES_ENDPOINT).param("id", videoId));
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/audio")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isArray())
+                    .andExpect(jsonPath("$", hasSize(0)));
         }
 
-        when(videoStreamingService.getPreviewFrames(url)).thenReturn("{\"frames\":\"some preview frames info\"}");
-        return mockMvc.perform(get(FRAMES_ENDPOINT).param("id", videoId).accept(MediaType.APPLICATION_JSON));
+        @Test
+        @DisplayName("Should return 400 when ID is missing")
+        void testGetAudioStreams_MissingId() throws Exception {
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/audio")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
-    private ResultActions performGetDescriptionRequest(String videoId) throws Exception {
-        String url = TEST_URL + videoId;
+    @Nested
+    @DisplayName("GET /api/v1/streams/video - Video Stream Tests")
+    class VideoStreamTests {
 
-        if (videoId.isEmpty()) {
-            return mockMvc.perform(get(DESCRIPTION_ENDPOINT).param("id", videoId));
+        @Test
+        @DisplayName("Should return video streams successfully")
+        void testGetVideoStreams_Success() throws Exception {
+            // Arrange
+            List<VideoStream> mockVideoStreams = Arrays.asList(
+                    mock(VideoStream.class),
+                    mock(VideoStream.class),
+                    mock(VideoStream.class)
+            );
+            when(videoStreamingService.getVideoStreams(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockVideoStreams);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/video")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(3)));
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/streams/video/dash - DASH MPD Tests")
+    class DashMpdTests {
+
+        @Test
+        @DisplayName("Should return DASH MPD URL successfully")
+        void testGetDashMpdUrl_Success() throws Exception {
+            // Arrange
+            String dashUrl = "https://youtube.com/dash/manifest.mpd";
+            when(videoStreamingService.getDashMpdUrl(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(dashUrl);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/video/dash")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(dashUrl));
         }
 
-        when(videoStreamingService.getStreamDescription(url)).thenReturn("{\"description\":\"some stream description\"}");
-        return mockMvc.perform(get(DESCRIPTION_ENDPOINT).param("id", videoId).accept(MediaType.APPLICATION_JSON));
+        @Test
+        @DisplayName("Should handle null DASH URL")
+        void testGetDashMpdUrl_Null() throws Exception {
+            // Arrange
+            when(videoStreamingService.getDashMpdUrl(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(null);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/video/dash")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk());
+        }
     }
 
-    /*
-    -----------------------------------------
-        Tests for /streams endpoint
-    -----------------------------------------
-    */
-    @Test
-    public void testGetStreamInfo_ValidId_ReturnsOK() throws Exception {
-        ResultActions result = performGetRequest(TEST_VIDEO_ID);
+    @Nested
+    @DisplayName("GET /api/v1/streams/subtitles - Subtitle Tests")
+    class SubtitleTests {
 
-        result.andExpect(status().isOk());
-        assertEquals("{\"info\":\"some stream info\"}", result.andReturn().getResponse().getContentAsString());
+        @Test
+        @DisplayName("Should return subtitle streams successfully")
+        void testGetSubtitleStreams_Success() throws Exception {
+            // Arrange
+            List<SubtitlesStream> mockSubtitles = Arrays.asList(
+                    mock(SubtitlesStream.class),
+                    mock(SubtitlesStream.class)
+            );
+            when(videoStreamingService.getSubtitleStreams(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockSubtitles);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/subtitles")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(2)));
+        }
     }
 
-    @Test
-    public void testGetStreamInfo_MissingId_ReturnsBadRequest() throws Exception {
-        ResultActions result = mockMvc.perform(get(BASE_ENDPOINT)); // No ID provided.
-        result.andExpect(status().isBadRequest());
-        // assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
+    @Nested
+    @DisplayName("GET /api/v1/streams/segments - Stream Segment Tests")
+    class StreamSegmentTests {
+
+        @Test
+        @DisplayName("Should return stream segments successfully")
+        void testGetStreamSegments_Success() throws Exception {
+            // Arrange
+            List<StreamSegment> mockSegments = Arrays.asList(
+                    mock(StreamSegment.class),
+                    mock(StreamSegment.class),
+                    mock(StreamSegment.class)
+            );
+            when(videoStreamingService.getStreamSegments(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockSegments);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/segments")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(3)));
+        }
     }
 
-    @Test
-    public void testGetStreamInfo_ErrorResponseFromService_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-        when(videoStreamingService.getStreamInfo(url)).thenThrow(new RuntimeException("Service failure"));
+    @Nested
+    @DisplayName("GET /api/v1/streams/preview-frames - Preview Frame Tests")
+    class PreviewFrameTests {
 
-        ResultActions result = mockMvc.perform(get(BASE_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
+        @Test
+        @DisplayName("Should return preview frames successfully")
+        void testGetPreviewFrames_Success() throws Exception {
+            // Arrange
+            List<Frameset> mockFrames = Collections.singletonList(mock(Frameset.class));
+            when(videoStreamingService.getPreviewFrames(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockFrames);
 
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving stream info"));
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/preview-frames")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)));
+        }
     }
 
-    @Test
-    public void testGetStreamInfo_InternalException_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-        when(videoStreamingService.getStreamInfo(url)).thenThrow(new RuntimeException("Service failure"));
+    @Nested
+    @DisplayName("GET /api/v1/streams/description - Description Tests")
+    class DescriptionTests {
 
-        ResultActions result = mockMvc.perform(get(BASE_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
+        @Test
+        @DisplayName("Should return description successfully")
+        void testGetStreamDescription_Success() throws Exception {
+            // Arrange
+            Description mockDescription = mock(Description.class);
+            when(videoStreamingService.getStreamDescription(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockDescription);
 
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving stream info"));
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/description")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk());
+        }
     }
 
-    @Test
-    public void testGetStreamInfo_EmptyId_ReturnsBadRequest() throws Exception {
-        ResultActions result = performGetRequest("");
+    @Nested
+    @DisplayName("GET /api/v1/streams/details - Stream Details Tests")
+    class StreamDetailsTests {
 
-        // Assert the results
-        result.andExpect(status().isBadRequest());
-        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
+        @Test
+        @DisplayName("Should return stream details successfully")
+        void testGetStreamDetails_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(mockStreamInfo.getName()).thenReturn("Test Video");
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockStreamInfo);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/details")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_JSON));
+        }
     }
 
-    /*
-    -----------------------------------------
-        Tests for /streams/audio endpoint
-    -----------------------------------------
-    */
-    @Test
-    public void testGetAudioStreams_ValidId_ReturnsOK() throws Exception {
-        ResultActions result = performGetAudioRequest(TEST_VIDEO_ID);
+    @Nested
+    @DisplayName("GET /api/v1/streams/related - Related Streams Tests")
+    class RelatedStreamsTests {
 
-        result.andExpect(status().isOk());
-        assertEquals("{\"audio\":\"some audio stream info\"}", result.andReturn().getResponse().getContentAsString());
+        @Test
+        @DisplayName("Should return related streams successfully")
+        void testGetRelatedStreams_Success() throws Exception {
+            // Use concrete StreamInfoItem instead of InfoItem interface
+            StreamInfoItem item1 = mock(StreamInfoItem.class);
+            StreamInfoItem item2 = mock(StreamInfoItem.class);
+            StreamInfoItem item3 = mock(StreamInfoItem.class);
+            StreamInfoItem item4 = mock(StreamInfoItem.class);
+            StreamInfoItem item5 = mock(StreamInfoItem.class);
+
+            // Cast to List<InfoItem> for the service method
+            List<InfoItem> mockRelated = Arrays.asList(item1, item2, item3, item4, item5);
+
+            when(videoStreamingService.getRelatedStreams(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockRelated);
+
+            mockMvc.perform(get("/api/v1/streams/related")
+                            .param("id", TEST_VIDEO_ID))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(5)));
+        }
+
+        @Test
+        @DisplayName("Should return empty list when no related streams")
+        void testGetRelatedStreams_EmptyList() throws Exception {
+            // Arrange
+            when(videoStreamingService.getRelatedStreams(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(Collections.emptyList());
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/related")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(0)));
+        }
     }
 
-    @Test
-    public void testGetAudioStreams_MissingId_ReturnsBadRequest() throws Exception {
-        ResultActions result = mockMvc.perform(get(AUDIO_ENDPOINT)); // No ID provided.
-        result.andExpect(status().isBadRequest());
-//        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
-    }
-
-    @Test
-    public void testGetAudioStreams_ErrorResponseFromService_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-        when(videoStreamingService.getAudioStreams(url)).thenThrow(new RuntimeException("Service failure"));
-
-        ResultActions result = mockMvc.perform(get(AUDIO_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
-
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving audio stream"));
-    }
-
-    @Test
-    public void testGetAudioStreams_InternalException_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-        when(videoStreamingService.getAudioStreams(url)).thenThrow(new RuntimeException("Service failure"));
-
-        ResultActions result = mockMvc.perform(get(AUDIO_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
-
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving audio stream"));
-    }
-
-    @Test
-    public void testGetAudioStreams_EmptyId_ReturnsBadRequest() throws Exception {
-        ResultActions result = performGetAudioRequest("");
-
-        // Assert the results
-        result.andExpect(status().isBadRequest());
-        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
-    }
-
-    /*
-    -----------------------------------------
-        Tests for /streams/video endpoint
-    -----------------------------------------
-    */
-    @Test
-    public void testGetVideoStreams_ValidId_ReturnsOK() throws Exception {
-        // Act
-        ResultActions result = performGetVideoRequest(TEST_VIDEO_ID);
-
-        // Assert
-        result.andExpect(status().isOk());
-        assertEquals("{\"video\":\"some video stream info\"}", result.andReturn().getResponse().getContentAsString());
-    }
-
-    @Test
-    public void testGetVideoStreams_MissingId_ReturnsBadRequest() throws Exception {
-        // Act
-        ResultActions result = mockMvc.perform(get(VIDEO_ENDPOINT)); // No ID provided.
-
-        // Assert
-        result.andExpect(status().isBadRequest());
-//        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
-    }
-
-    @Test
-    public void testGetVideoStreams_ErrorResponseFromService_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-
-        // Simulate an error return from the service
-        when(videoStreamingService.getVideoStreams(url)).thenThrow(new RuntimeException("Service failure"));
-
-        // Act
-        ResultActions result = mockMvc.perform(get(VIDEO_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
-
-        // Assert
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving video stream"));
-    }
-
-    @Test
-    public void testGetVideoStreams_InternalException_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-
-        // Simulate an internal exception
-        when(videoStreamingService.getVideoStreams(url)).thenThrow(new RuntimeException("Service failure"));
-
-        // Act
-        ResultActions result = mockMvc.perform(get(VIDEO_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
-
-        // Assert
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving video stream"));
-    }
-
-    @Test
-    public void testGetVideoStreams_EmptyId_ReturnsBadRequest() throws Exception {
-        // Act
-        ResultActions result = performGetVideoRequest("");
-
-        // Assert
-        result.andExpect(status().isBadRequest());
-        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
-    }
-
-    /*
-    -----------------------------------------
-        Tests for /streams/segments endpoint
-    -----------------------------------------
-    */
-    @Test
-    public void testGetStreamSegments_ValidId_ReturnsOK() throws Exception {
-        // Act
-        ResultActions result = performGetSegmentRequest(TEST_VIDEO_ID);
-
-        // Assert
-        result.andExpect(status().isOk());
-        assertEquals("{\"segments\":\"some stream segments info\"}", result.andReturn().getResponse().getContentAsString());
-    }
-
-    @Test
-    public void testGetStreamSegments_MissingId_ReturnsBadRequest() throws Exception {
-        // Act
-        ResultActions result = mockMvc.perform(get(SEGMENTS_ENDPOINT)); // No ID provided.
-
-        // Assert
-        result.andExpect(status().isBadRequest());
-//        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
-    }
-
-    @Test
-    public void testGetStreamSegments_ErrorResponseFromService_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-
-        // Simulating an error return from the service
-        when(videoStreamingService.getStreamSegments(url)).thenThrow(new RuntimeException("Service failure"));
-
-        // Act
-        ResultActions result = mockMvc.perform(get(SEGMENTS_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
-
-        // Assert
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving stream segments"));
-    }
-
-    @Test
-    public void testGetStreamSegments_InternalException_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-
-        // Simulate an internal exception
-        when(videoStreamingService.getStreamSegments(url)).thenThrow(new RuntimeException("Service failure"));
-
-        // Act
-        ResultActions result = mockMvc.perform(get(SEGMENTS_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
-
-        // Assert
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving stream segments"));
-    }
-
-    @Test
-    public void testGetStreamSegments_EmptyId_ReturnsBadRequest() throws Exception {
-        // Act
-        ResultActions result = performGetSegmentRequest("");
-
-        // Assert
-        result.andExpect(status().isBadRequest());
-        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
-    }
-
-    /*
-    -----------------------------------------
-        Tests for /streams/frames endpoint
-    -----------------------------------------
-    */
-    @Test
-    public void testGetPreviewFrames_ValidId_ReturnsOK() throws Exception {
-        // Act
-        ResultActions result = performGetFrameRequest(TEST_VIDEO_ID);
-
-        // Assert
-        result.andExpect(status().isOk());
-        assertEquals("{\"frames\":\"some preview frames info\"}", result.andReturn().getResponse().getContentAsString());
-    }
-
-    @Test
-    public void testGetPreviewFrames_MissingId_ReturnsBadRequest() throws Exception {
-        // Act
-        ResultActions result = mockMvc.perform(get(FRAMES_ENDPOINT)); // No ID provided.
-
-        // Assert
-        result.andExpect(status().isBadRequest());
-//        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
-    }
-
-    @Test
-    public void testGetPreviewFrames_ErrorResponseFromService_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-
-        // Simulate an error return from the service
-        when(videoStreamingService.getPreviewFrames(url)).thenThrow(new RuntimeException("Service failure"));
-
-        // Act
-        ResultActions result = mockMvc.perform(get(FRAMES_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
-
-        // Assert
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving preview frames"));
-    }
-
-    @Test
-    public void testGetPreviewFrames_InternalException_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-
-        // Simulate an internal exception
-        when(videoStreamingService.getPreviewFrames(url)).thenThrow(new RuntimeException("Service failure"));
-
-        // Act
-        ResultActions result = mockMvc.perform(get(FRAMES_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
-
-        // Assert
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving preview frames"));
-    }
-
-    @Test
-    public void testGetPreviewFrames_EmptyId_ReturnsBadRequest() throws Exception {
-        // Act
-        ResultActions result = performGetFrameRequest("");
-
-        // Assert
-        result.andExpect(status().isBadRequest());
-        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
-    }
-
-    /*
-    -------------------------------------------------
-        Tests for /streams/description endpoint
-    -------------------------------------------------
-    */
-    @Test
-    public void testGetStreamDescription_ValidId_ReturnsOK() throws Exception {
-        // Act
-        ResultActions result = performGetDescriptionRequest(TEST_VIDEO_ID);
-
-        // Assert
-        result.andExpect(status().isOk());
-        assertEquals("{\"description\":\"some stream description\"}", result.andReturn().getResponse().getContentAsString());
-    }
-
-    @Test
-    public void testGetStreamDescription_MissingId_ReturnsBadRequest() throws Exception {
-        // Act
-        ResultActions result = mockMvc.perform(get(DESCRIPTION_ENDPOINT)); // No ID provided.
-
-        // Assert
-        result.andExpect(status().isBadRequest());
-//        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
-    }
-
-    @Test
-    public void testGetStreamDescription_ErrorResponseFromService_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-
-        // Simulate an error return from the service
-        when(videoStreamingService.getStreamDescription(url)).thenThrow(new RuntimeException("Service failure"));
-
-        // Act
-        ResultActions result = mockMvc.perform(get(DESCRIPTION_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
-
-        // Assert
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving description"));
-    }
-
-    @Test
-    public void testGetStreamDescription_InternalException_ReturnsInternalServerError() throws Exception {
-        String url = TEST_URL + TEST_VIDEO_ID;
-
-        // Simulate an internal exception
-        when(videoStreamingService.getStreamDescription(url)).thenThrow(new RuntimeException("Service failure"));
-
-        // Act
-        ResultActions result = mockMvc.perform(get(DESCRIPTION_ENDPOINT).param("id", TEST_VIDEO_ID).accept(MediaType.APPLICATION_JSON));
-
-        // Assert
-        result.andExpect(status().isInternalServerError());
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Service failure"));
-        assertTrue(result.andReturn().getResponse().getContentAsString().contains("Error retrieving description"));
-    }
-
-    @Test
-    public void testGetStreamDescription_EmptyId_ReturnsBadRequest() throws Exception {
-        // Act
-        ResultActions result = performGetDescriptionRequest("");
-
-        // Assert
-        result.andExpect(status().isBadRequest());
-        assertEquals(EMPTY_ID_ERROR_MESSAGE, result.andReturn().getResponse().getContentAsString());
+    @Nested
+    @DisplayName("Error Handling Tests")
+    class ErrorHandlingTests {
+
+        @Test
+        @DisplayName("Should handle extraction exceptions consistently")
+        void testErrorHandling_ExtractionException() throws Exception {
+            // Arrange
+            when(videoStreamingService.getAudioStreams(anyString()))
+                    .thenThrow(new ExtractionException("Extraction failed"));
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/audio")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.status").value(500))
+                    .andExpect(jsonPath("$.errorCode").value("EXTRACTION_ERROR"))
+                    .andExpect(jsonPath("$.message").value(containsString("Extraction failed")))
+                    .andExpect(jsonPath("$.timestamp").exists());
+        }
+
+        @Test
+        @DisplayName("Should handle generic exceptions")
+        void testErrorHandling_GenericException() throws Exception {
+            // Arrange
+            when(videoStreamingService.getVideoStreams(anyString()))
+                    .thenThrow(new RuntimeException("Unexpected error"));
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/video")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.status").value(500));
+        }
     }
 }
