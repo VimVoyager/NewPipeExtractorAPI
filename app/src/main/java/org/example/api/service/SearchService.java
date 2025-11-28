@@ -54,8 +54,11 @@ public class SearchService {
 
             SearchResultDTO dto = SearchResultDTO.from(info);
 
+            // Filter out playlists and channels - only keep videos
+            List<SearchItemDTO> videoItems = filterVideosOnly(dto.getItems());
+
             // Deduplicate items by URL
-            List<SearchItemDTO> uniqueItems = deduplicateByUrl(dto.getItems());
+            List<SearchItemDTO> uniqueItems = deduplicateByUrl(videoItems);
             dto.setItems(uniqueItems);
 
             logger.info("Search completed. Found {} unique results out of {} total",
@@ -98,8 +101,11 @@ public class SearchService {
 
             SearchPageDTO dto = SearchPageDTO.from(page);
 
+            // Filter out playlists and channels - only keep videos
+            List<SearchItemDTO> videoItems = filterVideosOnly(dto.getItems());
+
             // Deduplicate items by URL
-            List<SearchItemDTO> uniqueItems = deduplicateByUrl(dto.getItems());
+            List<SearchItemDTO> uniqueItems = deduplicateByUrl(videoItems);
             dto.setItems(uniqueItems);
             dto.setItemCount(uniqueItems.size());
 
@@ -111,6 +117,19 @@ public class SearchService {
             logger.error("Failed to retrieve search page for: {} with pageUrl: {}", searchString, pageUrl, e);
             throw new ExtractionException("Failed to retrieve search page", e);
         }
+    }
+
+    /**
+     * Filters search items to only include videos (StreamInfoItem type).
+     * Excludes playlists and channels which can cause duplicate ID issues in the frontend.
+     *
+     * @param items List of all search items
+     * @return List containing only video items
+     */
+    private List<SearchItemDTO> filterVideosOnly(List<SearchItemDTO> items) {
+        return items.stream()
+                .filter(item -> "stream".equalsIgnoreCase(item.getType()))
+                .collect(Collectors.toList());
     }
 
     /**
