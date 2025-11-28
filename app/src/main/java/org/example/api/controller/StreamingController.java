@@ -1,18 +1,19 @@
 package org.example.api.controller;
 
+import org.example.api.dto.StreamDetailsDTO;
 import org.example.api.service.VideoStreamingService;
+import org.example.api.utils.ValidationUtils;
+import org.schabi.newpipe.extractor.InfoItem;
+import org.schabi.newpipe.extractor.stream.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 /**
  * REST controller for handling streaming-related API requests for YouTube information.
@@ -26,7 +27,6 @@ public class StreamingController {
     private static final Logger logger = LoggerFactory.getLogger(StreamingController.class);
     private final VideoStreamingService videoStreamingService;
 
-    @Autowired
     public StreamingController(VideoStreamingService videoStreamingService) {
         this.videoStreamingService = videoStreamingService;
     }
@@ -47,465 +47,145 @@ public class StreamingController {
      *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
      *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
      */
-    @GetMapping("/")
-    public ResponseEntity<?> getStreamInfo(@RequestParam(name = "id") String id) {
-        try {
-            logger.info("Retrieving stream info for ID: {}", id);
+    @GetMapping
+    public ResponseEntity<StreamInfo> getStreamInfo(@RequestParam(name = "id") String id) {
+        logger.info("Retrieving stream info for ID: {}", id);
 
-            // Validate URL
-            if (id == null || id.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "ID parameter is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
 
-            String url = YOUTUBE_URL + id;
-            String streamInfoJson = videoStreamingService.getStreamInfo(url);
-
-            // Check if it's an error response
-            if (streamInfoJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving stream info");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(streamInfoJson);
-        } catch (Exception e) {
-            logger.error("Error retrieving stream info for ID: {}", id, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving stream info",
-                            "details", e.getMessage()
-                    ));
-        }
+        StreamInfo info = videoStreamingService.getStreamInfo(url);
+        return ResponseEntity.ok(info);
     }
 
     /**
-     * Handles HTTP GET requests to retrieve audio stream information based on a provided ID.
-     *
-     * This endpoint requires an ID as a request parameter. It constructs a URL using
-     * the ID and interacts with the RestService to fetch audio stream information.
-     * On success, a ResponseEntity with the audio streams in JSON format
-     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
-     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
-     * or HTTP 500 Internal Server Error).
-     *
-     * @param id The ID of the stream to retrieve audio information for.
-     * @return A ResponseEntity object containing either:
-     *                           - A success response with the audio stream information in JSON format if the retrieval is successful (HTTP 200 OK).
-     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
-     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     * Get audio streams for a video.
      */
     @GetMapping("/audio")
-    public ResponseEntity<?> getAudioStreams(@RequestParam(name = "id") String id) throws Exception {
-        try {
-            logger.info("Retrieving audio stream for ID: {}", id);
+    public ResponseEntity<List<AudioStream>> getAudioStreams(@RequestParam(name = "id") String id) {
+        logger.info("Retrieving audio stream for ID: {}", id);
 
-            // Validate URL
-            if (id == null || id.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "ID parameter is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
 
-            String url = YOUTUBE_URL + id;
-            String audioStreamsJson = videoStreamingService.getAudioStreams(url);
-
-            // Check if it's an error response
-            if (audioStreamsJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving audio streams");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(audioStreamsJson);
-        } catch (Exception e) {
-
-            logger.error("Error retrieving audio stream for ID: {}", id, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving audio stream",
-                            "details", e.getMessage()
-                    ));
-        }
+        List<AudioStream> streams = videoStreamingService.getAudioStreams(url);
+        return ResponseEntity.ok(streams);
     }
 
     /**
-     * Handles HTTP GET requests to retrieve video stream information based on a provided ID.
-     *
-     * This endpoint requires an ID as a request parameter. It constructs a URL using
-     * the ID and interacts with the RestService to fetch video stream information.
-     * On success, a ResponseEntity with the video streams in JSON format
-     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
-     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
-     * or HTTP 500 Internal Server Error).
-     *
-     * @param id The ID of the stream to retrieve video information for.
-     * @return A ResponseEntity object containing either:
-     *                           - A success response with the video stream information in JSON format if the retrieval is successful (HTTP 200 OK).
-     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
-     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     * Get video-only streams.
      */
     @GetMapping("/video")
-    public ResponseEntity<?> getVideoStreams(@RequestParam(name = "id") String id) throws Exception {
-        try {
-            logger.info("Retrieving video stream for ID: {}", id);
+    public ResponseEntity<List<VideoStream>> getVideoStreams(@RequestParam(name = "id") String id) {
+        logger.info("Retrieving video stream for ID: {}", id);
 
-            // Validate URL
-            if (id == null || id.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "ID parameter is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
 
-            String url = YOUTUBE_URL + id;
-            String videoStreamsJson = videoStreamingService.getVideoStreams(url);
-
-            // Check if it's an error response
-            if (videoStreamsJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving video streams");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(videoStreamsJson);
-        } catch (Exception e) {
-
-            logger.error("Error retrieving video stream for ID: {}", id, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving video stream info",
-                            "details", e.getMessage()
-                    ));
-        }
-    }
-
-    @GetMapping("/video/dash")
-    public ResponseEntity<?> getDashMpdUrl(@RequestParam(name = "id") String id) throws Exception {
-        try {
-            logger.info("Retrieving video stream for ID: {}", id);
-
-            // Validate URL
-            if (id == null || id.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "ID parameter is required"));
-            }
-
-            String url = YOUTUBE_URL + id;
-            String videoStreamsJson = videoStreamingService.getDashMpdUrl(url);
-            logger.info(videoStreamsJson);
-
-            // Check if it's an error response
-            if (videoStreamsJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving video streams");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(videoStreamsJson);
-        } catch (Exception e) {
-
-            logger.error("Error retrieving video stream for ID: {}", id, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving video stream info",
-                            "details", e.getMessage()
-                    ));
-        }
+        List<VideoStream> streams = videoStreamingService.getVideoStreams(url);
+        return ResponseEntity.ok(streams);
     }
 
     /**
-     * Handles HTTP GET requests to retrieve subtitle stream information based on a provided ID.
-     *
-     * This endpoint requires an ID as a request parameter. It constructs a URL using
-     * the ID and interacts with the RestService to fetch subtitle stream information.
-     * On success, a ResponseEntity with the subtitle streams in JSON format
-     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
-     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
-     * or HTTP 500 Internal Server Error).
-     *
-     * @param id The ID of the stream to retrieve subtitle information for.
-     * @return A ResponseEntity object containing either:
-     *                           - A success response with the subtitle stream information in JSON format if the retrieval is successful (HTTP 200 OK).
-     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
-     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     * Get DASH MPD URL for adaptive streaming.
+     */
+    @GetMapping("/video/dash")
+    public ResponseEntity<String> getDashMpdUrl(@RequestParam(name = "id") String id) throws Exception {
+        logger.info("Retrieving DASH MPD URL for ID: {}", id);
+
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
+
+        String dashUrl = videoStreamingService.getDashMpdUrl(url);
+        return ResponseEntity.ok(dashUrl);
+    }
+
+    /**
+     * Get subtitle streams.
      */
     @GetMapping("/subtitles")
-    public ResponseEntity<?> getSubtitleStreams(@RequestParam(name = "id") String id) throws Exception {
-        try {
-            logger.info("Retrieving subtitle stream for ID: {}", id);
+    public ResponseEntity<List<SubtitlesStream>> getSubtitleStreams(@RequestParam(name = "id") String id) {
+        logger.info("Retrieving subtitle streams for ID: {}", id);
 
-            // Validate URL
-            if (id == null || id.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "ID parameter is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
 
-            String url = YOUTUBE_URL + id;
-            String subtitleStreamsJson = videoStreamingService.getSubtitleStreams(url);
-
-            // Check if it's an error response
-            if (subtitleStreamsJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving subtitle streams");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(subtitleStreamsJson);
-        } catch (Exception e) {
-
-            logger.error("Error retrieving subtitles for ID: {}", id, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving stream info",
-                            "details", e.getMessage()
-                    ));
-        }
+        List<SubtitlesStream> subtitles = videoStreamingService.getSubtitleStreams(url);
+        return ResponseEntity.ok(subtitles);
     }
 
     /**
-     * Handles HTTP GET requests to retrieve stream segments based on a provided ID.
-     *
-     * This endpoint requires an ID as a request parameter. It constructs a URL using
-     * the ID and interacts with the RestService to fetch stream segments.
-     * On success, a ResponseEntity with the stream segments in JSON format
-     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
-     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
-     * or HTTP 500 Internal Server Error).
-     *
-     * @param id The ID of the stream to retrieve segments for.
-     * @return  A ResponseEntity object containing either:
-     *                           - A success response with the stream segments in JSON format if the retrieval is successful (HTTP 200 OK).
-     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
-     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     * Get stream segments (chapters).
      */
     @GetMapping("/segments")
-    public ResponseEntity<?> getStreamSegments(@RequestParam(name = "id") String id) throws Exception {
-        try {
-            logger.info("Retrieving stream segments for ID: {}", id);
+    public ResponseEntity<List<StreamSegment>> getStreamSegments(@RequestParam(name = "id") String id) {
+        logger.info("Retrieving stream segments for ID: {}", id);
 
-            // Validate URL
-            if (id == null || id.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "ID parameter is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
 
-            String url = YOUTUBE_URL + id;
-            String streamSegmentsJson = videoStreamingService.getStreamSegments(url);
-
-            // Check if it's an error response
-            if (streamSegmentsJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving stream segments");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(streamSegmentsJson);
-        } catch (Exception e) {
-
-            logger.error("Error retrieving stream segments for ID: {}", id, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving stream segments",
-                            "details", e.getMessage()
-                    ));
-        }
+        List<StreamSegment> segments = videoStreamingService.getStreamSegments(url);
+        return ResponseEntity.ok(segments);
     }
 
     /**
-     * Handles HTTP GET requests to retrieve preview frames for a stream based on a provided ID.
-     *
-     * This endpoint requires an ID as a request parameter. It constructs a URL using
-     * the ID and interacts with the RestService to fetch preview frames.
-     * On success, a ResponseEntity with the preview frames in JSON format
-     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
-     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
-     * or HTTP 500 Internal Server Error).
-     *
-     * @param id The ID of the stream to retrieve preview frames for.
-     * @return A ResponseEntity object containing either:
-     *                           - A success response with the preview frames in JSON format if the retrieval is successful (HTTP 200 OK).
-     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
-     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     * Get preview frames for video scrubbing.
      */
-    @GetMapping("/frames")
-    public ResponseEntity<?> getPreviewFrames(@RequestParam(name = "id") String id) throws Exception {
-        try {
-            logger.info("Retrieving preview frames stream for ID: {}", id);
+    @GetMapping("/preview-frames")
+    public ResponseEntity<List<Frameset>> getPreviewFrames(@RequestParam(name = "id") String id) {
+        logger.info("Retrieving preview frames stream for ID: {}", id);
 
-            // Validate URL
-            if (id == null || id.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "ID parameter is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
 
-            String url = YOUTUBE_URL + id;
-            String streamFramesJson = videoStreamingService.getPreviewFrames(url);
-
-            // Check if it's an error response
-            if (streamFramesJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving preview frames");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(streamFramesJson);
-        } catch (Exception e) {
-
-            logger.error("Error retrieving preview frames for ID: {}", id, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving preview frames",
-                            "details", e.getMessage()
-                    ));
-        }
+        List<Frameset> frames = videoStreamingService.getPreviewFrames(url);
+        return ResponseEntity.ok(frames);
     }
 
     /**
-     * Handles HTTP GET requests to retrieve the description of a stream based on a provided ID.
-     *
-     * This endpoint requires an ID as a request parameter. It constructs a URL using
-     * the ID and interacts with the RestService to fetch the stream description.
-     * On success, a ResponseEntity with the stream description in JSON format
-     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
-     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
-     * or HTTP 500 Internal Server Error).
-     *
-     * @param id The ID of the stream to retrieve description for.
-     * @return  A ResponseEntity object containing either:
-     *                           - A success response with the stream description in JSON format if the retrieval is successful (HTTP 200 OK).
-     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
-     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     * Get stream description.
      */
     @GetMapping("/description")
-    public ResponseEntity<?> getStreamDescription(@RequestParam(name = "id") String id) throws Exception {
-        try {
-            logger.info("Retrieving description stream for ID: {}", id);
+    public ResponseEntity<Description> getStreamDescription(@RequestParam(name = "id") String id) {
+        logger.info("Retrieving description stream for ID: {}", id);
 
-            // Validate URL
-            if (id == null || id.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "ID parameter is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
 
-            String url = YOUTUBE_URL + id;
-            String streamDescriptionJson = videoStreamingService.getStreamDescription(url);
-
-            // Check if it's an error response
-            if (streamDescriptionJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving description streams");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(streamDescriptionJson);
-        } catch (Exception e) {
-
-            logger.error("Error retrieving description for ID: {}", id, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving description",
-                            "details", e.getMessage()
-                    ));
-        }
+        Description description = videoStreamingService.getStreamDescription(url);
+        return ResponseEntity.ok(description);
     }
 
     /**
-     * Handles HTTP GET requests to retrieve the details of a stream based on a provided ID.
-     *
-     * This endpoint requires an ID as a request parameter. It constructs a URL using
-     * the ID and interacts with the RestService to fetch the stream description.
-     * On success, a ResponseEntity with the stream description in JSON format
-     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
-     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
-     * or HTTP 500 Internal Server Error).
-     *
-     * @param id The ID of the stream to retrieve description for.
-     * @return  A ResponseEntity object containing either:
-     *                           - A success response with the stream details in JSON format if the retrieval is successful (HTTP 200 OK).
-     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
-     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     * Get comprehensive stream details (metadata).
      */
     @GetMapping("/details")
-    public ResponseEntity<?> getStreamDetails(@RequestParam(name = "id") String id) throws Exception {
-        try {
-            logger.info("Retrieving stream details for ID: {}", id);
+    public ResponseEntity<StreamDetailsDTO> getStreamDetails(@RequestParam(name = "id") String id) {
+        logger.info("Retrieving stream details for ID: {}", id);
 
-            // Validate URL
-            if (id == null || id.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "ID parameter is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
 
-            String url = YOUTUBE_URL + id;
-            String streamDescriptionJson = videoStreamingService.getStreamDetails(url);
+        // Get full stream info
+        StreamInfo info = videoStreamingService.getStreamInfo(url);
 
-            // Check if it's an error response
-            if (streamDescriptionJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving stream details");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
+        // Convert to DTO
+        StreamDetailsDTO details = StreamDetailsDTO.from(info);
 
-            return ResponseEntity.ok(streamDescriptionJson);
-        } catch (Exception e) {
-
-            logger.error("Error retrieving details for ID: {}", id, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving stream details",
-                            "details", e.getMessage()
-                    ));
-        }
+        return ResponseEntity.ok(details);
     }
 
+    /**
+     * Get related videos/streams.
+     */
     @GetMapping("/related")
-    public ResponseEntity<?> getRelatedStreams(@RequestParam(name = "id") String id) throws Exception {
-        try {
-            logger.info("Retrieving related streams for ID: {}", id);
+    public ResponseEntity<List<InfoItem>> getRelatedStreams(@RequestParam(name = "id") String id) {
+        logger.info("Retrieving related streams for ID: {}", id);
 
-            // Validate URL
-            if (id == null || id.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "ID parameter is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
 
-            String url = YOUTUBE_URL + id;
-            String relatedStreamsJson = videoStreamingService.getRelatedStreams(url);
-
-            // Check if it's an error response
-            if (relatedStreamsJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving related streams");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(relatedStreamsJson);
-        } catch (Exception e) {
-            logger.error("Error related streams for ID: {}", id, e);
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving related streams",
-                            "details", e.getMessage()
-                    ));
-        }
-
+        List<InfoItem> relatedItems = videoStreamingService.getRelatedStreams(url);
+        return ResponseEntity.ok(relatedItems);
     }
 }
