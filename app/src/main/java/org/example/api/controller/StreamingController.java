@@ -1,12 +1,14 @@
 package org.example.api.controller;
 
 import org.example.api.dto.StreamDetailsDTO;
+import org.example.api.service.DashManifestGeneratorService;
 import org.example.api.service.VideoStreamingService;
 import org.example.api.utils.ValidationUtils;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.stream.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,9 +28,11 @@ public class StreamingController {
     private static final String YOUTUBE_URL = "https://www.youtube.com/watch?v=";
     private static final Logger logger = LoggerFactory.getLogger(StreamingController.class);
     private final VideoStreamingService videoStreamingService;
+    private final DashManifestGeneratorService dashManifestGeneratorService;
 
-    public StreamingController(VideoStreamingService videoStreamingService) {
+    public StreamingController(VideoStreamingService videoStreamingService, DashManifestGeneratorService dashManifestGeneratorService) {
         this.videoStreamingService = videoStreamingService;
+        this.dashManifestGeneratorService = dashManifestGeneratorService;
     }
 
     /**
@@ -98,6 +102,29 @@ public class StreamingController {
 
         String dashUrl = videoStreamingService.getDashMpdUrl(url);
         return ResponseEntity.ok(dashUrl);
+    }
+
+    /**
+     * Get DASH MPD XML Manifest for adaptive bitrate streaming
+     */
+    @GetMapping("/dash")
+    public ResponseEntity<String> getDashManifest(@RequestParam(name = "id") String id) {
+        logger.info("Generating DASH manifest for ID: {}", id);
+
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
+
+        // Get stream information
+        StreamInfo streamInfo = videoStreamingService.getStreamInfo(url);
+
+        // Generate DASH manifest XML
+        String manifest = dashManifestGeneratorService.generateManifest(streamInfo);
+
+        logger.debug("Generated DASH manifest with {} characters", manifest.length());
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .body(manifest);
     }
 
     /**
