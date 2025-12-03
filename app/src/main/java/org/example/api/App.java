@@ -3,6 +3,7 @@
  */
 package org.example.api;
 
+import org.example.api.downloader.DownloaderImpl;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.localization.Localization;
 import org.slf4j.Logger;

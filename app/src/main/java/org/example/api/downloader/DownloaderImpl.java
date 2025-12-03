@@ -1,4 +1,4 @@
-package org.example.api;
+package org.example.api.downloader;
 
 import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
@@ -51,7 +51,12 @@ public class DownloaderImpl extends Downloader {
     public long getContentLength(String url) throws IOException {
         try {
             final Response response = head(url);
-            return Long.parseLong(Objects.requireNonNull(response.getHeader("Content-Length")));
+            String contentLength = response.getHeader("Content-Length");
+            if (contentLength == null) {
+                throw new IOException("Content-Length header is missing");
+            }
+            return Long.parseLong(contentLength);
+//            return Long.parseLong(Objects.requireNonNull(response.getHeader("Content-Length")));
         } catch (NumberFormatException e) {
             throw new IOException("Invalid content length", e);
         } catch (ReCaptchaException e) {
@@ -89,54 +94,58 @@ public class DownloaderImpl extends Downloader {
     }
 //  @Override
     public Response execute(@NonNull Request request) throws IOException, ReCaptchaException {
-        final String httpMethod = request.httpMethod();
-        final String url = request.url();
-        final Map<String, List<String>> headers = request.headers();
-        final byte[] dataToSend = request.dataToSend();
+        try {
+            final String httpMethod = request.httpMethod();
+            final String url = request.url();
+            final Map<String, List<String>> headers = request.headers();
+            final byte[] dataToSend = request.dataToSend();
 
-        RequestBody requestBody = null;
-        if (dataToSend != null) {
-            requestBody = RequestBody.create(null, dataToSend);
-        }
-
-        final okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder()
-                .method(httpMethod, requestBody).url(url)
-                .addHeader("User-Agent", USER_AGENT);
-
-        if (!StringUtils.isEmpty(mCookies)) {
-            requestBuilder.addHeader("Cookie", mCookies);
-        }
-
-        for (Map.Entry<String, List<String>> pair : headers.entrySet()) {
-            final String headerName = pair.getKey();
-            final List<String> headerValueList = pair.getValue();
-
-            if (headerValueList.size() > 1) {
-                requestBuilder.removeHeader(headerName);
-                for (String headerValue : headerValueList) {
-                    requestBuilder.addHeader(headerName, headerValue);
-                }
-            } else if (headerValueList.size() == 1) {
-                requestBuilder.header(headerName, headerValueList.get(0));
+            RequestBody requestBody = null;
+            if (dataToSend != null) {
+                requestBody = RequestBody.create(null, dataToSend);
             }
 
+            final okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder()
+                    .method(httpMethod, requestBody).url(url)
+                    .addHeader("User-Agent", USER_AGENT);
+
+            if (!StringUtils.isEmpty(mCookies)) {
+                requestBuilder.addHeader("Cookie", mCookies);
+            }
+
+            for (Map.Entry<String, List<String>> pair : headers.entrySet()) {
+                final String headerName = pair.getKey();
+                final List<String> headerValueList = pair.getValue();
+
+                if (headerValueList.size() > 1) {
+                    requestBuilder.removeHeader(headerName);
+                    for (String headerValue : headerValueList) {
+                        requestBuilder.addHeader(headerName, headerValue);
+                    }
+                } else if (headerValueList.size() == 1) {
+                    requestBuilder.header(headerName, headerValueList.get(0));
+                }
+
+            }
+
+            final okhttp3.Response response = client.newCall(requestBuilder.build()).execute();
+
+            if (response.code() == 429) {
+                response.close();
+
+                throw new ReCaptchaException("reCaptcha Challenge requested", url);
+            }
+
+            final ResponseBody body = response.body();
+            String responseBodyToReturn = null;
+
+            if (body != null) {
+                responseBodyToReturn = body.string();
+            }
+
+            return new Response(response.code(), response.message(), response.headers().toMultimap(), responseBodyToReturn, url);
+        } catch (IllegalArgumentException e) {
+            throw new IOException("Invalid URL: " + request.url(), e);
         }
-
-        final okhttp3.Response response = client.newCall(requestBuilder.build()).execute();
-
-        if (response.code() == 429) {
-            response.close();
-
-            throw new ReCaptchaException("reCaptcha Challenge requested", url);
-        }
-
-        final ResponseBody body = response.body();
-        String responseBodyToReturn = null;
-
-        if (body != null) {
-            responseBodyToReturn = body.string();
-        }
-
-        return new Response(response.code(), response.message(), response.headers().toMultimap(), responseBodyToReturn, url);
     }
 }
