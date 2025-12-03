@@ -1,0 +1,402 @@
+package org.example.api.dto.dash;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.schabi.newpipe.extractor.stream.AudioStream;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+
+/**
+ * Data Transfer Object representing metadata for an audio stream in a DASH manifest.
+ * Contains information about audio quality, codec, language, and segment locations.
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class AudioStreamMetadataDTO {
+
+    /**
+     * Unique identifier for this audio representation in the DASH manifest.
+     */
+    @NotBlank(message = "Audio stream ID cannot be blank")
+    @JsonProperty("id")
+    private String id;
+
+    /**
+     * Direct URL to the audio stream content.
+     */
+    @NotBlank(message = "Audio stream URL cannot be blank")
+    @JsonProperty("url")
+    private String url;
+
+    /**
+     * Audio codec identifier (e.g., "mp4a.40.2", "opus").
+     */
+    @NotBlank(message = "Audio codec cannot be blank")
+    @JsonProperty("codec")
+    private String codec;
+
+    /**
+     * MIME type of the audio stream (e.g., "audio/mp4", "audio/webm").
+     */
+    @NotBlank(message = "Audio MIME type cannot be blank")
+    @JsonProperty("mimeType")
+    private String mimeType;
+
+    /**
+     * Bandwidth required for this stream in bits per second.
+     */
+    @Min(value = 1, message = "Bandwidth must be at least 1")
+    @JsonProperty("bandwidth")
+    private int bandwidth;
+
+    /**
+     * Audio sampling rate in Hz (e.g., "44100", "48000").
+     */
+    @NotBlank(message = "Audio sampling rate cannot be blank")
+    @JsonProperty("audioSamplingRate")
+    private String audioSamplingRate;
+
+    /**
+     * Number of audio channels (e.g., 1 for mono, 2 for stereo, 6 for 5.1).
+     */
+    @Min(value = 1, message = "Audio channels must be at least 1")
+    @JsonProperty("audioChannels")
+    private int audioChannels;
+
+    /**
+     * Language code for this audio track (e.g., "en", "es", "und" for undefined).
+     */
+    @JsonProperty("language")
+    private String language;
+
+    /**
+     * Human-readable language name (e.g., "English", "Spanish", "Unknown").
+     */
+    @JsonProperty("languageName")
+    private String languageName;
+
+    /**
+     * Byte range for initialization segment (e.g., "0-722").
+     */
+    @JsonProperty("initRange")
+    private String initRange;
+
+    /**
+     * Byte range for index segment (e.g., "723-898").
+     */
+    @JsonProperty("indexRange")
+    private String indexRange;
+
+    /**
+     * Original format identifier from the extractor (optional, for debugging).
+     */
+    @JsonProperty("format")
+    private String format;
+
+    // Constructors
+
+    /**
+     * Default constructor for Jackson deserialization.
+     */
+    public AudioStreamMetadataDTO() {
+    }
+
+    /**
+     * Full constructor for creating an AudioStreamMetadataDTO with all fields.
+     */
+    public AudioStreamMetadataDTO(String id, String url, String codec, String mimeType,
+                                  int bandwidth, String audioSamplingRate, int audioChannels,
+                                  String language, String languageName,
+                                  String initRange, String indexRange, String format) {
+        this.id = id;
+        this.url = url;
+        this.codec = codec;
+        this.mimeType = mimeType;
+        this.bandwidth = bandwidth;
+        this.audioSamplingRate = audioSamplingRate;
+        this.audioChannels = audioChannels;
+        this.language = language;
+        this.languageName = languageName;
+        this.initRange = initRange;
+        this.indexRange = indexRange;
+        this.format = format;
+    }
+
+    // Static Factory Method
+
+    /**
+     * Creates an AudioStreamMetadataDTO from a NewPipe AudioStream object.
+     *
+     * @param stream The AudioStream from NewPipe extractor
+     * @param index  The index used to generate a unique ID
+     * @return A new AudioStreamMetadataDTO instance
+     */
+    public static AudioStreamMetadataDTO from(AudioStream stream, int index) {
+        if (stream == null) {
+            throw new IllegalArgumentException("AudioStream cannot be null");
+        }
+
+        AudioStreamMetadataDTO dto = new AudioStreamMetadataDTO();
+        dto.setId("audio-" + index);
+        dto.setUrl(stream.getContent());
+        dto.setCodec(stream.getCodec());
+        dto.setMimeType(stream.getFormat() != null ? stream.getFormat().getMimeType() : "audio/mp4");
+        dto.setBandwidth(stream.getBitrate());
+        dto.setAudioSamplingRate(String.valueOf(stream.getItagItem().getSampleRate()));
+        dto.setAudioChannels(stream.getItagItem().getAudioChannels() > 0 ? stream.getItagItem().getAudioChannels() : 2);
+
+        // Handle language information
+        String lang = stream.getAudioLocale() != null ?
+                stream.getAudioLocale().getLanguage() : "und";
+        dto.setLanguage(lang);
+        dto.setLanguageName(getLanguageDisplayName(lang));
+
+        // Extract init and index ranges if available
+        if (stream.getInitStart() >= 0 && stream.getInitEnd() > 0) {
+            dto.setInitRange(stream.getInitStart() + "-" + stream.getInitEnd());
+        }
+        if (stream.getIndexStart() >= 0 && stream.getIndexEnd() > 0) {
+            dto.setIndexRange(stream.getIndexStart() + "-" + stream.getIndexEnd());
+        }
+
+        dto.setFormat(stream.getFormat() != null ? stream.getFormat().getName() : null);
+
+        return dto;
+    }
+
+    /**
+     * Helper method to get display name for language code.
+     * This is a simple implementation - can be expanded with more language mappings.
+     *
+     * @param languageCode The ISO language code
+     * @return Human-readable language name
+     */
+    private static String getLanguageDisplayName(String languageCode) {
+        if (languageCode == null || languageCode.isEmpty()) {
+            return "Unknown";
+        }
+
+        switch (languageCode.toLowerCase()) {
+            case "en": return "English";
+            case "es": return "Spanish";
+            case "fr": return "French";
+            case "de": return "German";
+            case "it": return "Italian";
+            case "pt": return "Portuguese";
+            case "ru": return "Russian";
+            case "ja": return "Japanese";
+            case "ko": return "Korean";
+            case "zh": return "Chinese";
+            case "ar": return "Arabic";
+            case "hi": return "Hindi";
+            case "und": return "Unknown";
+            default: return languageCode.toUpperCase();
+        }
+    }
+
+    // Builder Pattern
+
+    /**
+     * Creates a new Builder for constructing AudioStreamMetadataDTO instances.
+     *
+     * @return A new Builder instance
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder class for fluent construction of AudioStreamMetadataDTO instances.
+     */
+    public static class Builder {
+        private String id;
+        private String url;
+        private String codec;
+        private String mimeType;
+        private int bandwidth;
+        private String audioSamplingRate;
+        private int audioChannels;
+        private String language;
+        private String languageName;
+        private String initRange;
+        private String indexRange;
+        private String format;
+
+        public Builder id(String id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder url(String url) {
+            this.url = url;
+            return this;
+        }
+
+        public Builder codec(String codec) {
+            this.codec = codec;
+            return this;
+        }
+
+        public Builder mimeType(String mimeType) {
+            this.mimeType = mimeType;
+            return this;
+        }
+
+        public Builder bandwidth(int bandwidth) {
+            this.bandwidth = bandwidth;
+            return this;
+        }
+
+        public Builder audioSamplingRate(String audioSamplingRate) {
+            this.audioSamplingRate = audioSamplingRate;
+            return this;
+        }
+
+        public Builder audioChannels(int audioChannels) {
+            this.audioChannels = audioChannels;
+            return this;
+        }
+
+        public Builder language(String language) {
+            this.language = language;
+            return this;
+        }
+
+        public Builder languageName(String languageName) {
+            this.languageName = languageName;
+            return this;
+        }
+
+        public Builder initRange(String initRange) {
+            this.initRange = initRange;
+            return this;
+        }
+
+        public Builder indexRange(String indexRange) {
+            this.indexRange = indexRange;
+            return this;
+        }
+
+        public Builder format(String format) {
+            this.format = format;
+            return this;
+        }
+
+        public AudioStreamMetadataDTO build() {
+            return new AudioStreamMetadataDTO(id, url, codec, mimeType, bandwidth,
+                    audioSamplingRate, audioChannels, language, languageName,
+                    initRange, indexRange, format);
+        }
+    }
+
+    // Getters and Setters
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public String getCodec() {
+        return codec;
+    }
+
+    public void setCodec(String codec) {
+        this.codec = codec;
+    }
+
+    public String getMimeType() {
+        return mimeType;
+    }
+
+    public void setMimeType(String mimeType) {
+        this.mimeType = mimeType;
+    }
+
+    public int getBandwidth() {
+        return bandwidth;
+    }
+
+    public void setBandwidth(int bandwidth) {
+        this.bandwidth = bandwidth;
+    }
+
+    public String getAudioSamplingRate() {
+        return audioSamplingRate;
+    }
+
+    public void setAudioSamplingRate(String audioSamplingRate) {
+        this.audioSamplingRate = audioSamplingRate;
+    }
+
+    public int getAudioChannels() {
+        return audioChannels;
+    }
+
+    public void setAudioChannels(int audioChannels) {
+        this.audioChannels = audioChannels;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
+    public String getLanguageName() {
+        return languageName;
+    }
+
+    public void setLanguageName(String languageName) {
+        this.languageName = languageName;
+    }
+
+    public String getInitRange() {
+        return initRange;
+    }
+
+    public void setInitRange(String initRange) {
+        this.initRange = initRange;
+    }
+
+    public String getIndexRange() {
+        return indexRange;
+    }
+
+    public void setIndexRange(String indexRange) {
+        this.indexRange = indexRange;
+    }
+
+    public String getFormat() {
+        return format;
+    }
+
+    public void setFormat(String format) {
+        this.format = format;
+    }
+
+    @Override
+    public String toString() {
+        return "AudioStreamMetadataDTO{" +
+                "id='" + id + '\'' +
+                ", codec='" + codec + '\'' +
+                ", bandwidth=" + bandwidth +
+                ", audioSamplingRate='" + audioSamplingRate + '\'' +
+                ", audioChannels=" + audioChannels +
+                ", language='" + language + '\'' +
+                ", languageName='" + languageName + '\'' +
+                '}';
+    }
+}
