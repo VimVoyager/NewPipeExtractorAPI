@@ -1,9 +1,9 @@
 package org.example.api.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.api.config.GlobalExceptionHandler;
 import org.example.api.dto.StreamDetailsDTO;
 import org.example.api.exception.ExtractionException;
+import org.example.api.service.DashManifestGeneratorService;
 import org.example.api.service.VideoStreamingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +39,9 @@ class StreamingControllerTest {
 
     @Mock
     private VideoStreamingService videoStreamingService;
+
+    @Mock
+    private DashManifestGeneratorService dashManifestGeneratorService;
 
     @InjectMocks
     private StreamingController streamingController;
@@ -219,6 +222,264 @@ class StreamingControllerTest {
                             .param("id", TEST_VIDEO_ID)
                             .contentType(MediaType.APPLICATION_JSON))
                     .andExpect(status().isOk());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/streams/dash-manifest - DASH Manifest Tests")
+    class DashManifestTests {
+
+        @Test
+        @DisplayName("Should return DASH manifest successfully")
+        void testGetDashManifest_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(mockStreamInfo.getName()).thenReturn("Test Video");
+            when(mockStreamInfo.getDuration()).thenReturn(120L);
+
+            String expectedManifest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                    "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\" " +
+                    "mediaPresentationDuration=\"PT2M\" minBufferTime=\"PT2S\" " +
+                    "profiles=\"urn:mpeg:dash:profile:isoff-on-demand:2011\">\n" +
+                    "  <Period duration=\"PT2M\">\n" +
+                    "  </Period>\n" +
+                    "</MPD>\n";
+
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockStreamInfo);
+            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+                    .thenReturn(expectedManifest);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/dash")
+                            .param("id", TEST_VIDEO_ID))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_XML))
+                    .andExpect(content().string(containsString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")))
+                    .andExpect(content().string(containsString("<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\"")))
+                    .andExpect(content().string(containsString("type=\"static\"")))
+                    .andExpect(content().string(containsString("<Period")))
+                    .andExpect(content().string(containsString("</MPD>")));
+
+            verify(videoStreamingService).getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID);
+            verify(dashManifestGeneratorService).generateManifest(mockStreamInfo);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when ID is missing")
+        void testGetDashManifest_MissingId() throws Exception {
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/dash"))
+                    .andExpect(status().isBadRequest());
+
+            verifyNoInteractions(videoStreamingService);
+            verifyNoInteractions(dashManifestGeneratorService);
+        }
+
+        @Test
+        @DisplayName("Should return manifest with video AdaptationSet")
+        void testGetDashManifest_WithVideoStreams() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            String manifestWithVideo = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                    "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\">\n" +
+                    "  <Period>\n" +
+                    "    <AdaptationSet id=\"0\" contentType=\"video\" mimeType=\"video/mp4\">\n" +
+                    "      <Representation id=\"video-1\" bandwidth=\"3000000\">\n" +
+                    "      </Representation>\n" +
+                    "    </AdaptationSet>\n" +
+                    "  </Period>\n" +
+                    "</MPD>\n";
+
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockStreamInfo);
+            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+                    .thenReturn(manifestWithVideo);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/dash")
+                            .param("id", TEST_VIDEO_ID))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_XML))
+                    .andExpect(content().string(containsString("contentType=\"video\"")))
+                    .andExpect(content().string(containsString("<Representation")));
+        }
+
+        @Test
+        @DisplayName("Should return manifest with audio AdaptationSets")
+        void testGetDashManifest_WithAudioStreams() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            String manifestWithAudio = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                    "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\">\n" +
+                    "  <Period>\n" +
+                    "    <AdaptationSet id=\"1\" contentType=\"audio\" lang=\"en\">\n" +
+                    "      <Representation id=\"audio-1\" bandwidth=\"128000\">\n" +
+                    "      </Representation>\n" +
+                    "    </AdaptationSet>\n" +
+                    "  </Period>\n" +
+                    "</MPD>\n";
+
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockStreamInfo);
+            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+                    .thenReturn(manifestWithAudio);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/dash")
+                            .param("id", TEST_VIDEO_ID))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_XML))
+                    .andExpect(content().string(containsString("contentType=\"audio\"")))
+                    .andExpect(content().string(containsString("lang=\"en\"")));
+        }
+
+        @Test
+        @DisplayName("Should return manifest with subtitle AdaptationSets")
+        void testGetDashManifest_WithSubtitles() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            String manifestWithSubtitles = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                    "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\">\n" +
+                    "  <Period>\n" +
+                    "    <AdaptationSet id=\"100\" contentType=\"text\" lang=\"en\">\n" +
+                    "      <Role schemeIdUri=\"urn:mpeg:dash:role:2011\" value=\"subtitles\"/>\n" +
+                    "      <Representation id=\"subtitle-1\">\n" +
+                    "      </Representation>\n" +
+                    "    </AdaptationSet>\n" +
+                    "  </Period>\n" +
+                    "</MPD>\n";
+
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockStreamInfo);
+            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+                    .thenReturn(manifestWithSubtitles);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/dash")
+                            .param("id", TEST_VIDEO_ID))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType(MediaType.APPLICATION_XML))
+                    .andExpect(content().string(containsString("contentType=\"text\"")))
+                    .andExpect(content().string(containsString("value=\"subtitles\"")));
+        }
+
+        @Test
+        @DisplayName("Should return 500 when stream info extraction fails")
+        void testGetDashManifest_ExtractionException() throws Exception {
+            // Arrange
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenThrow(new ExtractionException("Failed to extract stream info"));
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/dash")
+                            .param("id", TEST_VIDEO_ID))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.status").value(500))
+                    .andExpect(jsonPath("$.errorCode").value("EXTRACTION_ERROR"));
+
+            verify(videoStreamingService).getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID);
+            verifyNoInteractions(dashManifestGeneratorService);
+        }
+
+        @Test
+        @DisplayName("Should return 500 when manifest generation fails")
+        void testGetDashManifest_ManifestGenerationException() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockStreamInfo);
+            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+                    .thenThrow(new RuntimeException("Manifest generation failed"));
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/dash")
+                            .param("id", TEST_VIDEO_ID))
+                    .andExpect(status().isInternalServerError());
+
+            verify(videoStreamingService).getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID);
+            verify(dashManifestGeneratorService).generateManifest(mockStreamInfo);
+        }
+
+        @Test
+        @DisplayName("Should escape XML special characters in manifest")
+        void testGetDashManifest_XmlEscaping() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            String manifestWithEscapedChars = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                    "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\">\n" +
+                    "  <Period>\n" +
+                    "    <AdaptationSet>\n" +
+                    "      <BaseURL>https://example.com?param=1&amp;other=2</BaseURL>\n" +
+                    "    </AdaptationSet>\n" +
+                    "  </Period>\n" +
+                    "</MPD>\n";
+
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockStreamInfo);
+            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+                    .thenReturn(manifestWithEscapedChars);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/dash")
+                            .param("id", TEST_VIDEO_ID))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("&amp;")))
+                    .andExpect(content().string(not(containsString("&other")))); // Should not have unescaped &
+        }
+
+        @Test
+        @DisplayName("Should include proper content type header")
+        void testGetDashManifest_ContentTypeHeader() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            String manifest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><MPD></MPD>";
+
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockStreamInfo);
+            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+                    .thenReturn(manifest);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/dash")
+                            .param("id", TEST_VIDEO_ID))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", MediaType.APPLICATION_XML_VALUE));
+        }
+
+        @Test
+        @DisplayName("Should handle complete manifest with all stream types")
+        void testGetDashManifest_CompleteManifest() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            String completeManifest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                    "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\">\n" +
+                    "  <Period>\n" +
+                    "    <AdaptationSet id=\"0\" contentType=\"video\">\n" +
+                    "      <Representation id=\"video-1080p\"/>\n" +
+                    "      <Representation id=\"video-720p\"/>\n" +
+                    "    </AdaptationSet>\n" +
+                    "    <AdaptationSet id=\"1\" contentType=\"audio\" lang=\"en\">\n" +
+                    "      <Representation id=\"audio-en-high\"/>\n" +
+                    "    </AdaptationSet>\n" +
+                    "    <AdaptationSet id=\"100\" contentType=\"text\" lang=\"en\">\n" +
+                    "      <Representation id=\"subtitle-en\"/>\n" +
+                    "    </AdaptationSet>\n" +
+                    "  </Period>\n" +
+                    "</MPD>\n";
+
+            when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockStreamInfo);
+            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+                    .thenReturn(completeManifest);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/dash")
+                            .param("id", TEST_VIDEO_ID))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("contentType=\"video\"")))
+                    .andExpect(content().string(containsString("contentType=\"audio\"")))
+                    .andExpect(content().string(containsString("contentType=\"text\"")));
         }
     }
 
