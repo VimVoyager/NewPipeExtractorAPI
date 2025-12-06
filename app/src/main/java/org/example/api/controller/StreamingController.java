@@ -52,7 +52,7 @@ public class StreamingController {
      *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
      */
     @GetMapping
-    public ResponseEntity<StreamInfo> getStreamInfo(@RequestParam(name = "id") String id) {
+    public ResponseEntity<StreamInfo> getStreamInfo(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving stream info for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
@@ -66,7 +66,7 @@ public class StreamingController {
      * Get audio streams for a video.
      */
     @GetMapping("/audio")
-    public ResponseEntity<List<AudioStream>> getAudioStreams(@RequestParam(name = "id") String id) {
+    public ResponseEntity<List<AudioStream>> getAudioStreams(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving audio stream for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
@@ -80,7 +80,7 @@ public class StreamingController {
      * Get video-only streams.
      */
     @GetMapping("/video")
-    public ResponseEntity<List<VideoStream>> getVideoStreams(@RequestParam(name = "id") String id) {
+    public ResponseEntity<List<VideoStream>> getVideoStreams(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving video stream for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
@@ -94,7 +94,7 @@ public class StreamingController {
      * Get DASH MPD URL for adaptive streaming.
      */
     @GetMapping("/video/dash")
-    public ResponseEntity<String> getDashMpdUrl(@RequestParam(name = "id") String id) throws Exception {
+    public ResponseEntity<String> getDashMpdUrl(@RequestParam(name = "id", required = true) String id) throws Exception {
         logger.info("Retrieving DASH MPD URL for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
@@ -108,7 +108,7 @@ public class StreamingController {
      * Get DASH MPD XML Manifest for adaptive bitrate streaming
      */
     @GetMapping("/dash")
-    public ResponseEntity<String> getDashManifest(@RequestParam(name = "id") String id) {
+    public ResponseEntity<String> getDashManifest(@RequestParam(name = "id", required = true) String id) {
         logger.info("Generating DASH manifest for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
@@ -131,7 +131,7 @@ public class StreamingController {
      * Get subtitle streams.
      */
     @GetMapping("/subtitles")
-    public ResponseEntity<List<SubtitlesStream>> getSubtitleStreams(@RequestParam(name = "id") String id) {
+    public ResponseEntity<List<SubtitlesStream>> getSubtitleStreams(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving subtitle streams for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
@@ -145,7 +145,7 @@ public class StreamingController {
      * Get stream segments (chapters).
      */
     @GetMapping("/segments")
-    public ResponseEntity<List<StreamSegment>> getStreamSegments(@RequestParam(name = "id") String id) {
+    public ResponseEntity<List<StreamSegment>> getStreamSegments(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving stream segments for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
@@ -159,7 +159,7 @@ public class StreamingController {
      * Get preview frames for video scrubbing.
      */
     @GetMapping("/preview-frames")
-    public ResponseEntity<List<Frameset>> getPreviewFrames(@RequestParam(name = "id") String id) {
+    public ResponseEntity<List<Frameset>> getPreviewFrames(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving preview frames stream for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
@@ -173,7 +173,7 @@ public class StreamingController {
      * Get stream description.
      */
     @GetMapping("/description")
-    public ResponseEntity<Description> getStreamDescription(@RequestParam(name = "id") String id) {
+    public ResponseEntity<Description> getStreamDescription(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving description stream for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
@@ -187,7 +187,7 @@ public class StreamingController {
      * Get comprehensive stream details (metadata).
      */
     @GetMapping("/details")
-    public ResponseEntity<StreamDetailsDTO> getStreamDetails(@RequestParam(name = "id") String id) {
+    public ResponseEntity<StreamDetailsDTO> getStreamDetails(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving stream details for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
@@ -206,7 +206,7 @@ public class StreamingController {
      * Get related videos/streams.
      */
     @GetMapping("/related")
-    public ResponseEntity<List<InfoItem>> getRelatedStreams(@RequestParam(name = "id") String id) {
+    public ResponseEntity<List<InfoItem>> getRelatedStreams(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving related streams for ID: {}", id);
 
         String url = YOUTUBE_URL + id;

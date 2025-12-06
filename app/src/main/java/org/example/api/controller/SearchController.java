@@ -40,7 +40,7 @@ public class SearchController {
      */
     @GetMapping
     public ResponseEntity<SearchResultDTO> search(
-            @RequestParam(name = "searchString") String searchString,
+            @RequestParam(name = "searchString", required = true) String searchString,
             @RequestParam(name = "sortFilter", required = false) String sortFilter,
             @RequestParam(name = "contentFilters", required = false) String contentFilters
     ) {
@@ -70,8 +70,8 @@ public class SearchController {
      */
     @GetMapping("/page")
     public ResponseEntity<SearchPageDTO> searchPage(
-            @RequestParam(name = "searchString") String searchString,
-            @RequestParam(name = "pageUrl") String pageUrl,
+            @RequestParam(name = "searchString",required = true) String searchString,
+            @RequestParam(name = "pageUrl", required = true) String pageUrl,
             @RequestParam(name = "sortFilter", required = false) String sortFilter,
             @RequestParam(name = "contentFilters", required = false) String contentFilters
     ) {

@@ -13,7 +13,6 @@ import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 
 import java.io.IOException;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.io.InputStream;
 import java.util.List;
