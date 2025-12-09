@@ -1,8 +1,10 @@
 package org.example.api.controller;
 
 import org.example.api.dto.StreamDetailsDTO;
+import org.example.api.dto.dash.DashManifestConfigDTO;
 import org.example.api.service.DashManifestGeneratorService;
 import org.example.api.service.VideoStreamingService;
+import org.example.api.service.StreamSelectionService;
 import org.example.api.utils.ValidationUtils;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.stream.*;
@@ -29,10 +31,12 @@ public class StreamingController {
     private static final Logger logger = LoggerFactory.getLogger(StreamingController.class);
     private final VideoStreamingService videoStreamingService;
     private final DashManifestGeneratorService dashManifestGeneratorService;
+    private final StreamSelectionService streamSelectionService;
 
-    public StreamingController(VideoStreamingService videoStreamingService, DashManifestGeneratorService dashManifestGeneratorService) {
+    public StreamingController(VideoStreamingService videoStreamingService, DashManifestGeneratorService dashManifestGeneratorService, StreamSelectionService streamSelectionService) {
         this.videoStreamingService = videoStreamingService;
         this.dashManifestGeneratorService = dashManifestGeneratorService;
+        this.streamSelectionService = streamSelectionService;
     }
 
     /**
@@ -109,23 +113,51 @@ public class StreamingController {
      */
     @GetMapping("/dash")
     public ResponseEntity<String> getDashManifest(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Generating DASH manifest for ID: {}", id);
+        logger.info("Generating optimized DASH manifest for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
         ValidationUtils.requireValidUrl(url);
 
-        // Get stream information
+        // Get full stream information from NewPipe Extractor
         StreamInfo streamInfo = videoStreamingService.getStreamInfo(url);
 
-        // Generate DASH manifest XML
-        String manifest = dashManifestGeneratorService.generateManifest(streamInfo);
+        // Get ALL available streams
+        List<VideoStream> allVideoStreams = streamInfo.getVideoOnlyStreams();
+        List<AudioStream> allAudioStreams = streamInfo.getAudioStreams();
+        List<SubtitlesStream> allSubtitles = streamInfo.getSubtitles();
 
-        logger.debug("Generated DASH manifest with {} characters", manifest.length());
+        logger.info("Retrieved {} video, {} audio, {} subtitle streams",
+                allVideoStreams.size(), allAudioStreams.size(), allSubtitles.size());
+
+        // Apply intelligent stream selection
+        List<VideoStream> selectedVideoStreams = streamSelectionService.selectVideoStreams(allVideoStreams);
+        List<AudioStream> selectedAudioStreams = streamSelectionService.selectAudioStreams(allAudioStreams);
+        List<SubtitlesStream> selectedSubtitles = streamSelectionService.selectSubtitles(allSubtitles);
+
+        // Log selection results for debugging
+        streamSelectionService.logSelectedStreams(selectedVideoStreams, selectedAudioStreams);
+        streamSelectionService.logSelectedSubtitles(selectedSubtitles);
+
+        // Build config from selected streams (CHANGED)
+        DashManifestConfigDTO config = DashManifestConfigDTO.fromWithSelectedStreams(
+                streamInfo,
+                selectedVideoStreams,
+                selectedAudioStreams,
+                selectedSubtitles
+        );
+
+        // Generate manifest XML with selected streams (CHANGED)
+        String manifest = dashManifestGeneratorService.generateManifestXml(config);
+
+        logger.info("Generated optimized DASH manifest with {} characters (selected streams: {} video, {} audio, {} subtitle)",
+                manifest.length(), selectedVideoStreams.size(), selectedAudioStreams.size(), selectedSubtitles.size());
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_XML)
                 .body(manifest);
     }
+
+
 
     /**
      * Get subtitle streams.

@@ -2,13 +2,18 @@ package org.example.api.dto.dash;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.schabi.newpipe.extractor.stream.SubtitlesStream;
+import org.schabi.newpipe.extractor.stream.VideoStream;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Data Transfer Object representing the complete DASH manifest configuration.
@@ -206,6 +211,60 @@ public class DashManifestConfigDTO {
         }
 
         return duration.toString();
+    }
+
+    public static DashManifestConfigDTO fromWithSelectedStreams(
+            StreamInfo streamInfo,
+            List<VideoStream> selectedVideoStreams,
+            List<AudioStream> selectedAudioStreams,
+            List<SubtitlesStream> selectedSubtitles) {
+
+        DashManifestConfigDTO config = new DashManifestConfigDTO();
+
+        // Set metadata
+        config.setDurationSeconds(streamInfo.getDuration());
+        config.setType("static");
+        config.setMediaPresentationDuration(formatDuration(streamInfo.getDuration()));
+        config.setMinBufferTime("PT2S");
+        config.setProfiles("urn:mpeg:dash:profile:isoff-on-demand:2011");
+
+        // Convert SELECTED video streams to DTOs with index
+        List<VideoStreamMetadataDTO> videoStreamDTOs = new ArrayList<>();
+        int videoIndex = 1;
+        for (VideoStream stream : selectedVideoStreams) {
+            try {
+                videoStreamDTOs.add(VideoStreamMetadataDTO.from(stream, videoIndex++));
+            } catch (Exception e) {
+                System.err.println("Skipping invalid video stream: " + e.getMessage());
+            }
+        }
+        config.setVideoStreams(videoStreamDTOs);
+
+        // Convert SELECTED audio streams to DTOs with index
+        List<AudioStreamMetadataDTO> audioStreamDTOs = new ArrayList<>();
+        int audioIndex = 1;
+        for (AudioStream stream : selectedAudioStreams) {
+            try {
+                audioStreamDTOs.add(AudioStreamMetadataDTO.from(stream, audioIndex++));
+            } catch (Exception e) {
+                System.err.println("Skipping invalid audio stream: " + e.getMessage());
+            }
+        }
+        config.setAudioStreams(audioStreamDTOs);
+
+        // Convert SELECTED subtitle streams to DTOs with index
+        List<SubtitleMetadataDTO> subtitleStreamDTOs = new ArrayList<>();
+        int subtitleIndex = 1;
+        for (SubtitlesStream stream : selectedSubtitles) {
+            try {
+                subtitleStreamDTOs.add(SubtitleMetadataDTO.from(stream, subtitleIndex++));
+            } catch (Exception e) {
+                System.err.println("Skipping invalid subtitle stream: " + e.getMessage());
+            }
+        }
+        config.setSubtitleStreams(subtitleStreamDTOs);
+
+        return config;
     }
 
     // Builder Pattern
