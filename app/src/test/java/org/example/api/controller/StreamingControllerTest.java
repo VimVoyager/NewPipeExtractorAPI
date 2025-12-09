@@ -1,18 +1,22 @@
 package org.example.api.controller;
 
 import org.example.api.config.GlobalExceptionHandler;
-import org.example.api.dto.StreamDetailsDTO;
+import org.example.api.dto.dash.DashManifestConfigDTO;
 import org.example.api.exception.ExtractionException;
 import org.example.api.service.DashManifestGeneratorService;
+import org.example.api.service.StreamSelectionService;
 import org.example.api.service.VideoStreamingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.schabi.newpipe.extractor.InfoItem;
+import org.schabi.newpipe.extractor.MediaFormat;
+import org.schabi.newpipe.extractor.services.youtube.ItagItem;
 import org.schabi.newpipe.extractor.stream.*;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +25,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -42,6 +47,9 @@ class StreamingControllerTest {
 
     @Mock
     private DashManifestGeneratorService dashManifestGeneratorService;
+
+    @Mock
+    private StreamSelectionService streamSelectionService;
 
     @InjectMocks
     private StreamingController streamingController;
@@ -226,7 +234,7 @@ class StreamingControllerTest {
     }
 
     @Nested
-    @DisplayName("GET /api/v1/streams/dash-manifest - DASH Manifest Tests")
+    @DisplayName("GET /api/v1/streams/dash - DASH Manifest Tests")
     class DashManifestTests {
 
         @Test
@@ -236,6 +244,16 @@ class StreamingControllerTest {
             StreamInfo mockStreamInfo = mock(StreamInfo.class);
             when(mockStreamInfo.getName()).thenReturn("Test Video");
             when(mockStreamInfo.getDuration()).thenReturn(120L);
+
+            // Mock empty stream lists
+            when(mockStreamInfo.getVideoOnlyStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getAudioStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getSubtitles()).thenReturn(Collections.emptyList());
+
+            // Mock stream selection service to return empty lists
+            when(streamSelectionService.selectVideoStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectAudioStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectSubtitles(anyList())).thenReturn(Collections.emptyList());
 
             String expectedManifest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                     "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\" " +
@@ -247,7 +265,7 @@ class StreamingControllerTest {
 
             when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
                     .thenReturn(mockStreamInfo);
-            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+            when(dashManifestGeneratorService.generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class)))
                     .thenReturn(expectedManifest);
 
             // Act & Assert
@@ -261,8 +279,15 @@ class StreamingControllerTest {
                     .andExpect(content().string(containsString("<Period")))
                     .andExpect(content().string(containsString("</MPD>")));
 
+            // Verify the correct methods were called
             verify(videoStreamingService).getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID);
-            verify(dashManifestGeneratorService).generateManifest(mockStreamInfo);
+            verify(mockStreamInfo).getVideoOnlyStreams();
+            verify(mockStreamInfo).getAudioStreams();
+            verify(mockStreamInfo).getSubtitles();
+            verify(streamSelectionService).selectVideoStreams(anyList());
+            verify(streamSelectionService).selectAudioStreams(anyList());
+            verify(streamSelectionService).selectSubtitles(anyList());
+            verify(dashManifestGeneratorService).generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class));
         }
 
         @Test
@@ -274,6 +299,7 @@ class StreamingControllerTest {
 
             verifyNoInteractions(videoStreamingService);
             verifyNoInteractions(dashManifestGeneratorService);
+            verifyNoInteractions(streamSelectionService);
         }
 
         @Test
@@ -281,6 +307,32 @@ class StreamingControllerTest {
         void testGetDashManifest_WithVideoStreams() throws Exception {
             // Arrange
             StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(mockStreamInfo.getDuration()).thenReturn(120L);
+
+            // Mock video stream
+            VideoStream mockVideoStream = mock(VideoStream.class);
+            when(mockVideoStream.getId()).thenReturn("137");
+            when(mockVideoStream.getResolution()).thenReturn("1080p");
+            when(mockVideoStream.getBitrate()).thenReturn(3000000);
+
+            ItagItem mockVideoItagItem = mock(ItagItem.class);
+            when(mockVideoItagItem.getBitrate()).thenReturn(3000000);
+            when(mockVideoStream.getItagItem()).thenReturn(mockVideoItagItem);
+
+            MediaFormat mockVideoFormat = mock(MediaFormat.class);
+            when(mockVideoFormat.getName()).thenReturn("MPEG_4");
+            when(mockVideoStream.getFormat()).thenReturn(mockVideoFormat);
+
+            List<VideoStream> allVideoStreams = List.of(mockVideoStream);
+            when(mockStreamInfo.getVideoOnlyStreams()).thenReturn(allVideoStreams);
+            when(mockStreamInfo.getAudioStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getSubtitles()).thenReturn(Collections.emptyList());
+
+            // Mock stream selection to return the video stream
+            when(streamSelectionService.selectVideoStreams(allVideoStreams)).thenReturn(allVideoStreams);
+            when(streamSelectionService.selectAudioStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectSubtitles(anyList())).thenReturn(Collections.emptyList());
+
             String manifestWithVideo = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                     "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\">\n" +
                     "  <Period>\n" +
@@ -293,7 +345,7 @@ class StreamingControllerTest {
 
             when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
                     .thenReturn(mockStreamInfo);
-            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+            when(dashManifestGeneratorService.generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class)))
                     .thenReturn(manifestWithVideo);
 
             // Act & Assert
@@ -303,6 +355,9 @@ class StreamingControllerTest {
                     .andExpect(content().contentType(MediaType.APPLICATION_XML))
                     .andExpect(content().string(containsString("contentType=\"video\"")))
                     .andExpect(content().string(containsString("<Representation")));
+
+            verify(streamSelectionService).selectVideoStreams(allVideoStreams);
+            verify(dashManifestGeneratorService).generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class));
         }
 
         @Test
@@ -310,6 +365,36 @@ class StreamingControllerTest {
         void testGetDashManifest_WithAudioStreams() throws Exception {
             // Arrange
             StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(mockStreamInfo.getDuration()).thenReturn(120L);
+
+            // Mock audio stream
+            AudioStream mockAudioStream = mock(AudioStream.class);
+            when(mockAudioStream.getId()).thenReturn("140");
+            when(mockAudioStream.getAverageBitrate()).thenReturn(128000);
+            when(mockAudioStream.getAudioLocale()).thenReturn(Locale.ENGLISH);
+            when(mockAudioStream.getAudioTrackId()).thenReturn("en");
+            when(mockAudioStream.getAudioTrackName()).thenReturn("English");
+
+            // Mock ItagItem for audio stream
+            ItagItem mockAudioItagItem = mock(ItagItem.class);
+            when(mockAudioItagItem.getBitrate()).thenReturn(128000);
+            when(mockAudioStream.getItagItem()).thenReturn(mockAudioItagItem);
+
+            // Mock MediaFormat for audio stream
+            MediaFormat mockAudioFormat = mock(MediaFormat.class);
+            when(mockAudioFormat.getName()).thenReturn("M4A");
+            when(mockAudioStream.getFormat()).thenReturn(mockAudioFormat);
+
+            List<AudioStream> allAudioStreams = List.of(mockAudioStream);
+            when(mockStreamInfo.getVideoOnlyStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getAudioStreams()).thenReturn(allAudioStreams);
+            when(mockStreamInfo.getSubtitles()).thenReturn(Collections.emptyList());
+
+            // Mock stream selection to return the audio stream
+            when(streamSelectionService.selectVideoStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectAudioStreams(allAudioStreams)).thenReturn(allAudioStreams);
+            when(streamSelectionService.selectSubtitles(anyList())).thenReturn(Collections.emptyList());
+
             String manifestWithAudio = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                     "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\">\n" +
                     "  <Period>\n" +
@@ -322,7 +407,7 @@ class StreamingControllerTest {
 
             when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
                     .thenReturn(mockStreamInfo);
-            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+            when(dashManifestGeneratorService.generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class)))
                     .thenReturn(manifestWithAudio);
 
             // Act & Assert
@@ -332,6 +417,9 @@ class StreamingControllerTest {
                     .andExpect(content().contentType(MediaType.APPLICATION_XML))
                     .andExpect(content().string(containsString("contentType=\"audio\"")))
                     .andExpect(content().string(containsString("lang=\"en\"")));
+
+            verify(streamSelectionService).selectAudioStreams(allAudioStreams);
+            verify(dashManifestGeneratorService).generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class));
         }
 
         @Test
@@ -339,6 +427,29 @@ class StreamingControllerTest {
         void testGetDashManifest_WithSubtitles() throws Exception {
             // Arrange
             StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(mockStreamInfo.getDuration()).thenReturn(120L);
+
+            // Mock subtitle
+            SubtitlesStream mockSubtitle = mock(SubtitlesStream.class);
+            when(mockSubtitle.getLocale()).thenReturn(Locale.ENGLISH);
+            when(mockSubtitle.isAutoGenerated()).thenReturn(false);
+            when(mockSubtitle.getDisplayLanguageName()).thenReturn("English");
+
+            MediaFormat mockSubtitleFormat = mock(MediaFormat.class);
+            when(mockSubtitleFormat.getName()).thenReturn("vtt");
+            when(mockSubtitleFormat.getSuffix()).thenReturn("vtt");
+            when(mockSubtitle.getFormat()).thenReturn(mockSubtitleFormat);
+
+            List<SubtitlesStream> allSubtitles = List.of(mockSubtitle);
+            when(mockStreamInfo.getVideoOnlyStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getAudioStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getSubtitles()).thenReturn(allSubtitles);
+
+            // Mock stream selection to return the subtitle
+            when(streamSelectionService.selectVideoStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectAudioStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectSubtitles(allSubtitles)).thenReturn(allSubtitles);
+
             String manifestWithSubtitles = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                     "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\">\n" +
                     "  <Period>\n" +
@@ -352,7 +463,7 @@ class StreamingControllerTest {
 
             when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
                     .thenReturn(mockStreamInfo);
-            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+            when(dashManifestGeneratorService.generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class)))
                     .thenReturn(manifestWithSubtitles);
 
             // Act & Assert
@@ -362,6 +473,9 @@ class StreamingControllerTest {
                     .andExpect(content().contentType(MediaType.APPLICATION_XML))
                     .andExpect(content().string(containsString("contentType=\"text\"")))
                     .andExpect(content().string(containsString("value=\"subtitles\"")));
+
+            verify(streamSelectionService).selectSubtitles(allSubtitles);
+            verify(dashManifestGeneratorService).generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class));
         }
 
         @Test
@@ -380,6 +494,7 @@ class StreamingControllerTest {
 
             verify(videoStreamingService).getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID);
             verifyNoInteractions(dashManifestGeneratorService);
+            verifyNoInteractions(streamSelectionService);
         }
 
         @Test
@@ -387,9 +502,18 @@ class StreamingControllerTest {
         void testGetDashManifest_ManifestGenerationException() throws Exception {
             // Arrange
             StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(mockStreamInfo.getDuration()).thenReturn(120L);
+            when(mockStreamInfo.getVideoOnlyStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getAudioStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getSubtitles()).thenReturn(Collections.emptyList());
+
+            when(streamSelectionService.selectVideoStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectAudioStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectSubtitles(anyList())).thenReturn(Collections.emptyList());
+
             when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
                     .thenReturn(mockStreamInfo);
-            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+            when(dashManifestGeneratorService.generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class)))
                     .thenThrow(new RuntimeException("Manifest generation failed"));
 
             // Act & Assert
@@ -398,14 +522,24 @@ class StreamingControllerTest {
                     .andExpect(status().isInternalServerError());
 
             verify(videoStreamingService).getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID);
-            verify(dashManifestGeneratorService).generateManifest(mockStreamInfo);
+            verify(dashManifestGeneratorService).generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class));
         }
+
 
         @Test
         @DisplayName("Should escape XML special characters in manifest")
         void testGetDashManifest_XmlEscaping() throws Exception {
             // Arrange
             StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(mockStreamInfo.getDuration()).thenReturn(120L);
+            when(mockStreamInfo.getVideoOnlyStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getAudioStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getSubtitles()).thenReturn(Collections.emptyList());
+
+            when(streamSelectionService.selectVideoStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectAudioStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectSubtitles(anyList())).thenReturn(Collections.emptyList());
+
             String manifestWithEscapedChars = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                     "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\">\n" +
                     "  <Period>\n" +
@@ -417,7 +551,7 @@ class StreamingControllerTest {
 
             when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
                     .thenReturn(mockStreamInfo);
-            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+            when(dashManifestGeneratorService.generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class)))
                     .thenReturn(manifestWithEscapedChars);
 
             // Act & Assert
@@ -425,7 +559,7 @@ class StreamingControllerTest {
                             .param("id", TEST_VIDEO_ID))
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("&amp;")))
-                    .andExpect(content().string(not(containsString("&other")))); // Should not have unescaped &
+                    .andExpect(content().string(not(containsString("&other"))));
         }
 
         @Test
@@ -433,11 +567,20 @@ class StreamingControllerTest {
         void testGetDashManifest_ContentTypeHeader() throws Exception {
             // Arrange
             StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(mockStreamInfo.getDuration()).thenReturn(120L);
+            when(mockStreamInfo.getVideoOnlyStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getAudioStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getSubtitles()).thenReturn(Collections.emptyList());
+
+            when(streamSelectionService.selectVideoStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectAudioStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectSubtitles(anyList())).thenReturn(Collections.emptyList());
+
             String manifest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><MPD></MPD>";
 
             when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
                     .thenReturn(mockStreamInfo);
-            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+            when(dashManifestGeneratorService.generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class)))
                     .thenReturn(manifest);
 
             // Act & Assert
@@ -447,11 +590,22 @@ class StreamingControllerTest {
                     .andExpect(header().string("Content-Type", MediaType.APPLICATION_XML_VALUE));
         }
 
+
+
         @Test
         @DisplayName("Should handle complete manifest with all stream types")
         void testGetDashManifest_CompleteManifest() throws Exception {
             // Arrange
             StreamInfo mockStreamInfo = mock(StreamInfo.class);
+            when(mockStreamInfo.getDuration()).thenReturn(120L);
+            when(mockStreamInfo.getVideoOnlyStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getAudioStreams()).thenReturn(Collections.emptyList());
+            when(mockStreamInfo.getSubtitles()).thenReturn(Collections.emptyList());
+
+            when(streamSelectionService.selectVideoStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectAudioStreams(anyList())).thenReturn(Collections.emptyList());
+            when(streamSelectionService.selectSubtitles(anyList())).thenReturn(Collections.emptyList());
+
             String completeManifest = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                     "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\">\n" +
                     "  <Period>\n" +
@@ -470,7 +624,7 @@ class StreamingControllerTest {
 
             when(videoStreamingService.getStreamInfo(YOUTUBE_URL + TEST_VIDEO_ID))
                     .thenReturn(mockStreamInfo);
-            when(dashManifestGeneratorService.generateManifest(mockStreamInfo))
+            when(dashManifestGeneratorService.generateManifestXml(ArgumentMatchers.any(DashManifestConfigDTO.class)))
                     .thenReturn(completeManifest);
 
             // Act & Assert
