@@ -28,20 +28,13 @@ By wrapping NewPipe Extractor in a REST API, we enable:
 
 ### 1. Intelligent Stream Selection
 
-**Problem**: YouTube videos can have 50-100+ stream combinations (different qualities, formats, codecs). Sending all of these to the frontend creates:
-- Bloated DASH manifests (15,000+ lines)
-- Overwhelmed video players
-- Poor user experience
-
-**Solution**: `StreamSelectionService` intelligently filters streams:
-
 Video Selection Strategy
 - Select 3-6 quality levels (144p → 4K)
 - Prioritize standard resolutions (720p, 1080p, etc.)
 - Ensure minimum quality diversity
 - Sort by quality for optimal player behavior
 
-Audio Selection Strategy  
+Audio Selection Strategy
 - One stream per language
 - Prefer M4A/AAC format (better compatibility)
 - Prioritize by itag (known quality levels)
@@ -53,20 +46,7 @@ Subtitle Selection Strategy
 - Filter by format (VTT preferred)
 - Sort by language priority (original → English → others)
 
-
-**Result**: 
-- 90% reduction in manifest size
-- Faster video loading
-- Better player performance
-- Maintained quality options
-
-### 2. Server-Side DASH Manifest Generation
-
-**Why Server-Side?**
-- **Performance**: Eliminated 1,400+ lines of frontend code
-- **Consistency**: Unified manifest format across all clients
-- **Optimization**: Pre-selected optimal streams
-- **Caching**: Can cache manifests for repeat requests
+### 2. DASH Manifest Generation
 
 **DASH Manifest Structure**:
 ```xml
@@ -102,23 +82,19 @@ Subtitle Selection Strategy
 
 ### 3. Comprehensive Error Handling
 
-```
-  ApiException (Base)
-      │
-      ├─ ValidationException (400 Bad Request)
-      │  • Missing parameters
-      │  • Invalid URL format
-      │  • Empty search strings
-      │
-      └─ ExtractionException (500 Server Error)
-         • NewPipe extraction failures
-         • YouTube unavailable
-         • Network errors
-  GlobalExceptionHandler catches all:
-  • Returns consistent JSON error responses
-  • Logs errors appropriately
-  • Provides error codes for debugging
-```
+`ApiException (Base)`
+ - `ValidationException` (400 Bad Request)
+    - Missing parameters
+    - Invalid URL format
+    - Empty search Strings
+ - `ExtractionException` (500 Server Error)
+    - NewPipe extracton failures
+    - YouTube unavailable
+    - Network errors
+`GlobalExceptionHandler` catches all:
+ - Returns consisten JSON erros responses
+ - Logs errors appropriately
+ - Provides error codes for debugging
 
 Error Response Format:
 ```json
@@ -248,53 +224,6 @@ mvn test jacoco:report
 
 # View report at: target/site/jacoco/index.html
 ```
-
-## Badges
-
-Add badges from somewhere like: [shields.io](https://shields.io/)
-
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
-
-## Tech Stack
-
-Spring Boot, Java
-
-
-## Run Locally
-
-Clone the project
-
-```bash
-  git clone https://github.com/VimVoyager/NewPipeExtractorAPI.git
-```
-
-Go to the project directory
-
-```bash
-  cd NewPipeExtractorAPI/app
-```
-
-Install dependencies
-
-```bash
-  mvn install
-```
-
-Start the server
-
-```bash
-  mvn spring-boot:run
-```
-
-
-## Running Tests
-
-To run tests, run the following command
-
-```bash
-  mvn test
-```
-
 
 ## Authors
 
