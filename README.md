@@ -171,7 +171,7 @@ spring.jackson.default-property-inclusion=non_null
 #### Development Mode
 
 ```bash
-# Using Maven wrapper (recommended)
+# Using Maven wrapper
 ./mvnw spring-boot:run
 
 # Or with Maven installed
@@ -185,7 +185,7 @@ mvn spring-boot:run
 
 ```bash
 # Build JAR
-./mvnw clean package -DskipTests
+mvn clean package -DskipTests
 
 # Run JAR
 java -jar target/newpipe-extractor-api-*.jar
@@ -217,6 +217,11 @@ mvn test
 mvn test -Dtest=StreamingControllerTest
 ```
 
+### Run Specific Test in a Test Class
+
+```bash
+mvn test -Dtest=StreamingControllerTest#testGetStreamInfoSuccess
+```
 ### Run with Coverage
 
 ```bash

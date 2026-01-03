@@ -14,6 +14,7 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.services.youtube.ItagItem;
@@ -634,6 +635,27 @@ class StreamingControllerTest {
                     .andExpect(content().string(containsString("contentType=\"video\"")))
                     .andExpect(content().string(containsString("contentType=\"audio\"")))
                     .andExpect(content().string(containsString("contentType=\"text\"")));
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/streams/thumbnails - Thumbnail Tests")
+    class ThumbnailTests {
+
+        @Test
+        @DisplayName("Should return stream thumbnails successfully")
+        void testGetStreamThumbnails_Success() throws Exception {
+             // Arrange
+            List<Image> mockThumbnails = Collections.singletonList(mock(Image.class));
+            when(videoStreamingService.getStreamThumbnails(YOUTUBE_URL + TEST_VIDEO_ID))
+                    .thenReturn(mockThumbnails);
+
+            // Act & Assert
+            mockMvc.perform(get("/api/v1/streams/thumbnails")
+                            .param("id", TEST_VIDEO_ID)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)));
         }
     }
 

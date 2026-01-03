@@ -1,6 +1,7 @@
 package org.example.api.service;
 
 import org.example.api.exception.ExtractionException;
+import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.stream.*;
 import org.slf4j.Logger;
@@ -84,6 +85,23 @@ public class VideoStreamingService {
         } catch (Exception e) {
             logger.error("Failed to extract DASH MPD URL for: {}", url, e);
             throw new ExtractionException("Failed to retrieve DASH MPD URL", e);
+        }
+    }
+
+    /**
+     * Extracts thumbnail images for a given stream URL
+     *
+     * @param url The URL of the stream
+     * @return List of subtitle streams
+     * @throws ExtractionException if extraction fails
+     */
+    public List<Image> getStreamThumbnails(String url) {
+        try {
+            logger.info("Extracting stream thumbnails for URL: {}", url);
+            return StreamInfo.getInfo(url).getThumbnails();
+        } catch (Exception e) {
+            logger.error("Failed to extract subtitle streams for URL: {}", url, e);
+            throw new ExtractionException("Failed to retrieve subtitle streams", e);
         }
     }
 

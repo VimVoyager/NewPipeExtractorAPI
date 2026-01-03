@@ -6,6 +6,7 @@ import org.example.api.service.DashManifestGeneratorService;
 import org.example.api.service.VideoStreamingService;
 import org.example.api.service.StreamSelectionService;
 import org.example.api.utils.ValidationUtils;
+import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.stream.*;
 import org.slf4j.Logger;
@@ -157,6 +158,19 @@ public class StreamingController {
                 .body(manifest);
     }
 
+    /**
+     * Get stream thumbnails
+     */
+    @GetMapping("/thumbnails")
+    public ResponseEntity<List<Image>> getThumbnails(@RequestParam(name = "id", required = true) String id) {
+        logger.info("Retrieving stream thumbnails for ID: {}", id);
+
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
+
+        List<Image> thumbnails = videoStreamingService.getStreamThumbnails(url);
+        return ResponseEntity.ok(thumbnails);
+    }
 
     /**
      * Get subtitle streams.

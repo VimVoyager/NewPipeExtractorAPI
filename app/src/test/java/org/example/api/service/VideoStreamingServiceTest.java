@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
+import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.stream.*;
 
@@ -218,6 +219,33 @@ class VideoStreamingServiceTest {
     }
 
     @Nested
+    @DisplayName("Thumbnail tests")
+    class thumbnailTests {
+
+        @Test
+        @DisplayName("Should return stream thumbnail images successfully")
+        void testGetStreamThumbnails_Success() throws Exception {
+            // Arrange
+            StreamInfo mockStreamInfo = createMockStreamInfo();
+            List<Image> mockThumbnails = createMockThumbnails();
+            when(mockStreamInfo.getThumbnails()).thenReturn(mockThumbnails);
+
+            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
+                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+
+                // Act
+                List<Image> result = videoStreamingService.getStreamThumbnails(TEST_URL);
+
+                // Assert
+                assertNotNull(result);
+                assertEquals(1, result.size());
+            }
+
+
+        }
+    }
+
+    @Nested
     @DisplayName("Subtitle Tests")
     class SubtitleTests {
 
@@ -384,6 +412,11 @@ class VideoStreamingServiceTest {
         SubtitlesStream sub1 = mock(SubtitlesStream.class);
         SubtitlesStream sub2 = mock(SubtitlesStream.class);
         return Arrays.asList(sub1, sub2);
+    }
+
+    private List<Image> createMockThumbnails() {
+        Image thumbnail = mock(Image.class);
+        return Collections.singletonList(thumbnail);
     }
 
     private List<StreamSegment> createMockSegments() {
