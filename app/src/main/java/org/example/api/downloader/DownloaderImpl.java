@@ -5,7 +5,7 @@ import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
 import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
-import spark.utils.StringUtils;
+//import spark.utils.StringUtils;
 
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
@@ -17,6 +17,8 @@ import java.util.concurrent.TimeUnit;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+
+import static org.sparkproject.jetty.util.StringUtil.isEmpty;
 
 public class DownloaderImpl extends Downloader {
     public static final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:43.0) Gecko/20100101 Firefox/43.0";
@@ -69,7 +71,7 @@ public class DownloaderImpl extends Downloader {
                     .method("GET", null).url(siteUrl)
                     .addHeader("User-Agent", USER_AGENT);
 
-            if (!StringUtils.isEmpty(mCookies)) {
+            if (!isEmpty(mCookies)) {
                 requestBuilder.addHeader("Cookie", mCookies);
             }
 
@@ -79,11 +81,6 @@ public class DownloaderImpl extends Downloader {
 
             if (response.code() == 429) {
                 throw new ReCaptchaException("reCaptcha Challenge requested", siteUrl);
-            }
-
-            if (body == null) {
-                response.close();
-                return null;
             }
 
             return body.byteStream();
@@ -101,14 +98,14 @@ public class DownloaderImpl extends Downloader {
 
             RequestBody requestBody = null;
             if (dataToSend != null) {
-                requestBody = RequestBody.create(null, dataToSend);
+                requestBody = RequestBody.create(dataToSend, null);
             }
 
             final okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder()
                     .method(httpMethod, requestBody).url(url)
                     .addHeader("User-Agent", USER_AGENT);
 
-            if (!StringUtils.isEmpty(mCookies)) {
+            if (!isEmpty(mCookies)) {
                 requestBuilder.addHeader("Cookie", mCookies);
             }
 
@@ -122,7 +119,7 @@ public class DownloaderImpl extends Downloader {
                         requestBuilder.addHeader(headerName, headerValue);
                     }
                 } else if (headerValueList.size() == 1) {
-                    requestBuilder.header(headerName, headerValueList.get(0));
+                    requestBuilder.header(headerName, headerValueList.getFirst());
                 }
 
             }
@@ -144,7 +141,7 @@ public class DownloaderImpl extends Downloader {
 
             return new Response(response.code(), response.message(), response.headers().toMultimap(), responseBodyToReturn, url);
         } catch (IllegalArgumentException e) {
-            throw new IOException("Invalid URL: " + request.url(), e);
+            throw new IOException("Invalid URL: %s".formatted(request.url()), e);
         }
     }
 }
