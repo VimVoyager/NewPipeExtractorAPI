@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -139,15 +140,13 @@ public class SearchService {
      * @return Deduplicated list of search items
      */
     private List<SearchItemDTO> deduplicateByUrl(List<SearchItemDTO> items) {
-        return items.stream()
+        return new ArrayList<>(items.stream()
                 .collect(Collectors.toMap(
                         SearchItemDTO::getUrl,
                         item -> item,
                         (existing, replacement) -> existing, // Keep first occurrence
                         LinkedHashMap::new // Preserve order
                 ))
-                .values()
-                .stream()
-                .collect(Collectors.toList());
+                .values());
     }
 }

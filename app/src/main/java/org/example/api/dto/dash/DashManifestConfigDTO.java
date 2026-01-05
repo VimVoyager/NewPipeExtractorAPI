@@ -13,7 +13,6 @@ import org.schabi.newpipe.extractor.stream.VideoStream;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Data Transfer Object representing the complete DASH manifest configuration.
@@ -405,13 +404,6 @@ public class DashManifestConfigDTO {
 
     @Override
     public String toString() {
-        return "DashManifestConfigDTO{" +
-                "type='" + type + '\'' +
-                ", mediaPresentationDuration='" + mediaPresentationDuration + '\'' +
-                ", durationSeconds=" + durationSeconds +
-                ", videoStreams=" + videoStreams.size() +
-                ", audioStreams=" + audioStreams.size() +
-                ", subtitleStreams=" + subtitleStreams.size() +
-                '}';
+        return "DashManifestConfigDTO{type='%s', mediaPresentationDuration='%s', durationSeconds=%d, videoStreams=%d, audioStreams=%d, subtitleStreams=%d}".formatted(type, mediaPresentationDuration, durationSeconds, videoStreams.size(), audioStreams.size(), subtitleStreams.size());
     }
 }

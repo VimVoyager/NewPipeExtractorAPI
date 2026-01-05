@@ -80,7 +80,7 @@ public class NewPipeController {
         } catch (Exception e) {
             logger.error("Error retrieving services", e);
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Error retrieving services: " + e.getMessage());
+            errorResponse.put("message", "Error retrieving services: %s".formatted(e.getMessage()));
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }

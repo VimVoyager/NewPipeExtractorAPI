@@ -131,7 +131,7 @@ public class VideoStreamMetadataDTO {
         }
 
         VideoStreamMetadataDTO dto = new VideoStreamMetadataDTO();
-        dto.setId("video-" + index);
+        dto.setId("video-%d".formatted(index));
         dto.setUrl(stream.getContent());
         dto.setCodec(stream.getCodec());
         dto.setMimeType(stream.getFormat() != null ? stream.getFormat().getMimeType() : "video/mp4");
@@ -142,10 +142,10 @@ public class VideoStreamMetadataDTO {
 
         // Extract init and index ranges if available
         if (stream.getInitStart() >= 0 && stream.getInitEnd() > 0) {
-            dto.setInitRange(stream.getInitStart() + "-" + stream.getInitEnd());
+            dto.setInitRange("%d-%d".formatted(stream.getInitStart(), stream.getInitEnd()));
         }
         if (stream.getIndexStart() >= 0 && stream.getIndexEnd() > 0) {
-            dto.setIndexRange(stream.getIndexStart() + "-" + stream.getIndexEnd());
+            dto.setIndexRange("%d-%d".formatted(stream.getIndexStart(), stream.getIndexEnd()));
         }
 
         dto.setFormat(stream.getFormat() != null ? stream.getFormat().getName() : null);
@@ -333,14 +333,6 @@ public class VideoStreamMetadataDTO {
 
     @Override
     public String toString() {
-        return "VideoStreamMetadataDTO{" +
-                "id='" + id + '\'' +
-                ", width=" + width +
-                ", height=" + height +
-                ", frameRate='" + frameRate + '\'' +
-                ", bandwidth=" + bandwidth +
-                ", codec='" + codec + '\'' +
-                ", mimeType='" + mimeType + '\'' +
-                '}';
+        return "VideoStreamMetadataDTO{id='%s', width=%d, height=%d, frameRate='%s', bandwidth=%d, codec='%s', mimeType='%s'}".formatted(id, width, height, frameRate, bandwidth, codec, mimeType);
     }
 }

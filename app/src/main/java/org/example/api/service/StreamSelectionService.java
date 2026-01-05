@@ -20,7 +20,6 @@ public class StreamSelectionService {
 
     private static final Logger logger = LoggerFactory.getLogger(StreamSelectionService.class);
 
-    // Preferred audio itags in priority order (higher quality first)
     private static final List<String> PREFERRED_AUDIO_ITAGS = List.of(
             "141", // m4a 256kbps
             "140", // m4a 128kbps
@@ -30,7 +29,6 @@ public class StreamSelectionService {
             "139"  // m4a 48kbps
     );
 
-    // Standard quality levels in priority order
     private static final List<String> QUALITY_LEVELS = List.of(
             "2160p", // 4K
             "1440p", // 2K
@@ -42,13 +40,10 @@ public class StreamSelectionService {
             "144p"
     );
 
-    // Minimum number of video quality options to provide
     private static final int MIN_VIDEO_QUALITIES = 3;
 
-    // Maximum number of video quality options to provide
     private static final int MAX_VIDEO_QUALITIES = 6;
 
-    // Preferred subtitle formats
     private static final List<String> PREFERRED_SUBTITLE_FORMATS = List.of(
             "vtt", "srv3", "srv2", "srv1", "ttml"
     );
@@ -90,7 +85,7 @@ public class StreamSelectionService {
                             .noneMatch(existing -> existing.getId().equals(s.getId())))
                     .sorted((s1, s2) -> Integer.compare(s2.getBitrate(), s1.getBitrate()))
                     .limit(MIN_VIDEO_QUALITIES - selectedStreams.size())
-                    .collect(Collectors.toList());
+                    .toList();
 
             selectedStreams.addAll(remainingStreams);
         }
@@ -217,7 +212,10 @@ public class StreamSelectionService {
         // First, try preferred itag
         for (String itag : PREFERRED_AUDIO_ITAGS) {
             Optional<AudioStream> match = streams.stream()
-                    .filter(s -> String.valueOf(s.getItagItem().id).equals(itag))
+                    .filter(s -> {
+                        assert s.getItagItem() != null;
+                        return String.valueOf(s.getItagItem().id).equals(itag);
+                    })
                     .findFirst();
             if (match.isPresent()) {
                 return match.get();
@@ -229,16 +227,18 @@ public class StreamSelectionService {
                 .filter(s -> s.getFormat() != null &&
                         (s.getFormat().getName().equalsIgnoreCase("M4A") ||
                                 s.getFormat().getName().equalsIgnoreCase("MP4A")))
-                .max(Comparator.comparingInt(s -> s.getItagItem().getBitrate()));
+                .max(Comparator.comparingInt(s -> {
+                    assert s.getItagItem() != null;
+                    return s.getItagItem().getBitrate();
+                }));
 
-        if (m4aStream.isPresent()) {
-            return m4aStream.get();
-        }
+        return m4aStream.orElseGet(() -> streams.stream()
+                .max(Comparator.comparingInt(s -> {
+                    assert s.getItagItem() != null;
+                    return s.getItagItem().getBitrate();
+                }))
+                .orElse(null));
 
-        // Final fallback: Highest bitrate stream
-        return streams.stream()
-                .max(Comparator.comparingInt(s -> s.getItagItem().getBitrate()))
-                .orElse(null);
     }
 
     /**
@@ -283,8 +283,11 @@ public class StreamSelectionService {
         // Try preferred formats in order
         for (String format : PREFERRED_SUBTITLE_FORMATS) {
             List<SubtitlesStream> filtered = subtitles.stream()
-                    .filter(sub -> format.equalsIgnoreCase(sub.getFormat().getName()) ||
-                            format.equalsIgnoreCase(sub.getFormat().getSuffix()))
+                    .filter(sub -> {
+                        assert sub.getFormat() != null;
+                        return format.equalsIgnoreCase(sub.getFormat().getName()) ||
+                                format.equalsIgnoreCase(sub.getFormat().getSuffix());
+                    })
                     .collect(Collectors.toList());
 
             if (!filtered.isEmpty()) {
@@ -354,6 +357,8 @@ public class StreamSelectionService {
             logger.info("Selected {} video streams:", videoStreams.size());
             for (int i = 0; i < videoStreams.size(); i++) {
                 VideoStream stream = videoStreams.get(i);
+                assert stream.getFormat() != null;
+                assert stream.getItagItem() != null;
                 logger.info("  {}. {} - {} - {} bps",
                         i + 1, stream.getResolution(), stream.getFormat().getName(),
                         stream.getItagItem().getBitrate());
@@ -370,6 +375,8 @@ public class StreamSelectionService {
                 String languageName = stream.getAudioTrackName() != null
                         ? stream.getAudioTrackName()
                         : "Unknown";
+                assert stream.getFormat() != null;
+                assert stream.getItagItem() != null;
                 logger.info("  {}. {} ({}) - {} - {} bps",
                         i + 1, languageName, language, stream.getFormat().getName(),
                         stream.getItagItem().getBitrate());
@@ -396,6 +403,7 @@ public class StreamSelectionService {
             String displayName = subtitle.getDisplayLanguageName() != null
                     ? subtitle.getDisplayLanguageName()
                     : lang.toUpperCase();
+            assert subtitle.getFormat() != null;
             logger.info("  {}. {} ({}) - {} [{}]",
                     i + 1, displayName, lang, subtitle.getFormat().getName(), type);
         }

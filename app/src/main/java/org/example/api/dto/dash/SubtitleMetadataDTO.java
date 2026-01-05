@@ -142,14 +142,11 @@ public class SubtitleMetadataDTO {
             return "application/ttml+xml"; // Default to TTML
         }
 
-        switch (format) {
-            case VTT:
-                return "text/vtt";
-            case SRT:
-                return "application/x-subrip";
-            default:
-                return "application/ttml+xml";
-        }
+        return switch (format) {
+            case VTT -> "text/vtt";
+            case SRT -> "application/x-subrip";
+            default -> "application/ttml+xml";
+        };
     }
 
     /**
@@ -164,25 +161,25 @@ public class SubtitleMetadataDTO {
             return "Unknown";
         }
 
-        switch (languageCode.toLowerCase()) {
-            case "en": return "English";
-            case "es": return "Spanish";
-            case "fr": return "French";
-            case "de": return "German";
-            case "it": return "Italian";
-            case "pt": return "Portuguese";
-            case "ru": return "Russian";
-            case "ja": return "Japanese";
-            case "ko": return "Korean";
-            case "zh": return "Chinese";
-            case "ar": return "Arabic";
-            case "hi": return "Hindi";
-            case "nl": return "Dutch";
-            case "pl": return "Polish";
-            case "tr": return "Turkish";
-            case "und": return "Unknown";
-            default: return languageCode.toUpperCase();
-        }
+        return switch (languageCode.toLowerCase()) {
+            case "en" -> "English";
+            case "es" -> "Spanish";
+            case "fr" -> "French";
+            case "de" -> "German";
+            case "it" -> "Italian";
+            case "pt" -> "Portuguese";
+            case "ru" -> "Russian";
+            case "ja" -> "Japanese";
+            case "ko" -> "Korean";
+            case "zh" -> "Chinese";
+            case "ar" -> "Arabic";
+            case "hi" -> "Hindi";
+            case "nl" -> "Dutch";
+            case "pl" -> "Polish";
+            case "tr" -> "Turkish";
+            case "und" -> "Unknown";
+            default -> languageCode.toUpperCase();
+        };
     }
 
     // Builder Pattern
@@ -323,12 +320,6 @@ public class SubtitleMetadataDTO {
 
     @Override
     public String toString() {
-        return "SubtitleMetadataDTO{" +
-                "id='" + id + '\'' +
-                ", language='" + language + '\'' +
-                ", languageName='" + languageName + '\'' +
-                ", mimeType='" + mimeType + '\'' +
-                ", kind='" + kind + '\'' +
-                '}';
+        return "SubtitleMetadataDTO{id='%s', language='%s', languageName='%s', mimeType='%s', kind='%s'}".formatted(id, language, languageName, mimeType, kind);
     }
 }

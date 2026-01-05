@@ -115,29 +115,29 @@ public class ManifestXmlBuilder {
         // Extract base language code (remove region if present)
         String baseCode = languageCode.split("[-_]")[0].toLowerCase();
 
-        switch (baseCode) {
-            case "en": return "English";
-            case "es": return "Spanish";
-            case "fr": return "French";
-            case "de": return "German";
-            case "it": return "Italian";
-            case "pt": return "Portuguese";
-            case "ru": return "Russian";
-            case "ja": return "Japanese";
-            case "ko": return "Korean";
-            case "zh": return "Chinese";
-            case "ar": return "Arabic";
-            case "hi": return "Hindi";
-            case "nl": return "Dutch";
-            case "pl": return "Polish";
-            case "tr": return "Turkish";
-            case "sv": return "Swedish";
-            case "no": return "Norwegian";
-            case "da": return "Danish";
-            case "fi": return "Finnish";
-            case "und": return "Unknown";
-            default: return baseCode.toUpperCase();
-        }
+        return switch (baseCode) {
+            case "en" -> "English";
+            case "es" -> "Spanish";
+            case "fr" -> "French";
+            case "de" -> "German";
+            case "it" -> "Italian";
+            case "pt" -> "Portuguese";
+            case "ru" -> "Russian";
+            case "ja" -> "Japanese";
+            case "ko" -> "Korean";
+            case "zh" -> "Chinese";
+            case "ar" -> "Arabic";
+            case "hi" -> "Hindi";
+            case "nl" -> "Dutch";
+            case "pl" -> "Polish";
+            case "tr" -> "Turkish";
+            case "sv" -> "Swedish";
+            case "no" -> "Norwegian";
+            case "da" -> "Danish";
+            case "fi" -> "Finnish";
+            case "und" -> "Unknown";
+            default -> baseCode.toUpperCase();
+        };
     }
 
     /**

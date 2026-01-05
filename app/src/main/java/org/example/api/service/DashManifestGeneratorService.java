@@ -165,7 +165,7 @@ public class DashManifestGeneratorService {
         // Sort by quality (highest first)
         List<VideoStreamMetadataDTO> sorted = videoStreams.stream()
                 .sorted(Comparator.comparingInt(VideoStreamMetadataDTO::getHeight).reversed())
-                .collect(Collectors.toList());
+                .toList();
 
         // Get the most common mimeType
         String mimeType = sorted.stream()
@@ -230,7 +230,7 @@ public class DashManifestGeneratorService {
 
         // SegmentBase (if ranges available)
         if (video.getInitRange() != null && video.getIndexRange() != null) {
-            xml.append(generateSegmentBase(video.getInitRange(), video.getIndexRange(), 4));
+            xml.append(generateSegmentBase(video.getInitRange(), video.getIndexRange()));
         }
 
         xml.append(ManifestXmlBuilder.indent(3))
@@ -264,7 +264,7 @@ public class DashManifestGeneratorService {
                     if (b.equals("en")) return 1;
                     return a.compareTo(b);
                 })
-                .collect(Collectors.toList());
+                .toList();
 
         int adaptationSetId = 1;
         for (String language : sortedLanguages) {
@@ -292,10 +292,10 @@ public class DashManifestGeneratorService {
         // Sort by bandwidth (highest first)
         List<AudioStreamMetadataDTO> sorted = audioStreams.stream()
                 .sorted(Comparator.comparingInt(AudioStreamMetadataDTO::getBandwidth).reversed())
-                .collect(Collectors.toList());
+                .toList();
 
         // Get language name and mimeType
-        String languageName = sorted.get(0).getLanguageName();
+        String languageName = sorted.getFirst().getLanguageName();
         if (languageName == null) {
             languageName = ManifestXmlBuilder.getLanguageName(language);
         }
@@ -370,7 +370,7 @@ public class DashManifestGeneratorService {
 
         // SegmentBase (if ranges available)
         if (audio.getInitRange() != null && audio.getIndexRange() != null) {
-            xml.append(generateSegmentBase(audio.getInitRange(), audio.getIndexRange(), 4));
+            xml.append(generateSegmentBase(audio.getInitRange(), audio.getIndexRange()));
         }
 
         xml.append(ManifestXmlBuilder.indent(3))
@@ -397,7 +397,7 @@ public class DashManifestGeneratorService {
         // Sort languages alphabetically
         List<String> sortedLanguages = streamsByLanguage.keySet().stream()
                 .sorted()
-                .collect(Collectors.toList());
+                .toList();
 
         int adaptationSetId = 100; // Start subtitle IDs at 100 to avoid conflicts
         for (String language : sortedLanguages) {
@@ -473,11 +473,11 @@ public class DashManifestGeneratorService {
      *
      * @param initRange Initialization range (e.g., "0-740")
      * @param indexRange Index range (e.g., "741-1048")
-     * @param indentLevel Indentation level
      * @return SegmentBase XML string
      */
-    private String generateSegmentBase(String initRange, String indexRange, int indentLevel) {
+    private String generateSegmentBase(String initRange, String indexRange) {
         StringBuilder xml = new StringBuilder();
+        int indentLevel = 4;
 
         xml.append(ManifestXmlBuilder.indent(indentLevel))
                 .append("<SegmentBase indexRange=\"")

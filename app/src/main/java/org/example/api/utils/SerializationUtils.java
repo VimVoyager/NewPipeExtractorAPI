@@ -107,7 +107,7 @@ public class SerializationUtils {
 
             return writer.writeValueAsString(obj);
         } catch (Exception e) {
-            System.err.println("Serialization Error: " + e.getMessage());
+            System.err.printf("Serialization Error: %s%n", e.getMessage());
             e.printStackTrace();
             return "{\"message\":\"Error serializing response\"}";
         }

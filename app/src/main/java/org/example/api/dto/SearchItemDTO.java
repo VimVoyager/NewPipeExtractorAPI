@@ -90,20 +90,26 @@ public class SearchItemDTO {
         dto.setUrl(item.getUrl());
 
         // Get thumbnail URL (first available thumbnail)
-        if (item.getThumbnails() != null && !item.getThumbnails().isEmpty()) {
-            dto.setThumbnailUrl(item.getThumbnails().get(0).getUrl());
+        if (!item.getThumbnails().isEmpty()) {
+            dto.setThumbnailUrl(item.getThumbnails().getFirst().getUrl());
         }
 
         // Map based on item type
-        if (item instanceof StreamInfoItem) {
-            dto.setType("stream");
-            mapStreamInfo(dto, (StreamInfoItem) item);
-        } else if (item instanceof ChannelInfoItem) {
-            dto.setType("channel");
-            mapChannelInfo(dto, (ChannelInfoItem) item);
-        } else if (item instanceof PlaylistInfoItem) {
-            dto.setType("playlist");
-            mapPlaylistInfo(dto, (PlaylistInfoItem) item);
+        switch (item) {
+            case StreamInfoItem streamInfoItem -> {
+                dto.setType("stream");
+                mapStreamInfo(dto, streamInfoItem);
+            }
+            case ChannelInfoItem channelInfoItem -> {
+                dto.setType("channel");
+                mapChannelInfo(dto, channelInfoItem);
+            }
+            case PlaylistInfoItem playlistInfoItem -> {
+                dto.setType("playlist");
+                mapPlaylistInfo(dto, playlistInfoItem);
+            }
+            default -> {
+            }
         }
 
         return dto;
@@ -118,8 +124,8 @@ public class SearchItemDTO {
         dto.setUploaderVerified(streamItem.isUploaderVerified());
 
         // Get uploader avatar
-        if (streamItem.getUploaderAvatars() != null && !streamItem.getUploaderAvatars().isEmpty()) {
-            dto.setUploaderAvatarUrl(streamItem.getUploaderAvatars().get(0).getUrl());
+        if (!streamItem.getUploaderAvatars().isEmpty()) {
+            dto.setUploaderAvatarUrl(streamItem.getUploaderAvatars().getFirst().getUrl());
         }
 
         dto.setDuration(streamItem.getDuration());

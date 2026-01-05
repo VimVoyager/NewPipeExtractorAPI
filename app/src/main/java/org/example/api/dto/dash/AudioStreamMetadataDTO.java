@@ -137,11 +137,12 @@ public class AudioStreamMetadataDTO {
         }
 
         AudioStreamMetadataDTO dto = new AudioStreamMetadataDTO();
-        dto.setId("audio-" + index);
+        dto.setId("audio-%d".formatted(index));
         dto.setUrl(stream.getContent());
         dto.setCodec(stream.getCodec());
         dto.setMimeType(stream.getFormat() != null ? stream.getFormat().getMimeType() : "audio/mp4");
         dto.setBandwidth(stream.getBitrate());
+        assert stream.getItagItem() != null;
         dto.setAudioSamplingRate(String.valueOf(stream.getItagItem().getSampleRate()));
         dto.setAudioChannels(stream.getItagItem().getAudioChannels() > 0 ? stream.getItagItem().getAudioChannels() : 2);
 
@@ -153,10 +154,10 @@ public class AudioStreamMetadataDTO {
 
         // Extract init and index ranges if available
         if (stream.getInitStart() >= 0 && stream.getInitEnd() > 0) {
-            dto.setInitRange(stream.getInitStart() + "-" + stream.getInitEnd());
+            dto.setInitRange("%d-%d".formatted(stream.getInitStart(), stream.getInitEnd()));
         }
         if (stream.getIndexStart() >= 0 && stream.getIndexEnd() > 0) {
-            dto.setIndexRange(stream.getIndexStart() + "-" + stream.getIndexEnd());
+            dto.setIndexRange("%d-%d".formatted(stream.getIndexStart(), stream.getIndexEnd()));
         }
 
         dto.setFormat(stream.getFormat() != null ? stream.getFormat().getName() : null);
@@ -176,22 +177,22 @@ public class AudioStreamMetadataDTO {
             return "Unknown";
         }
 
-        switch (languageCode.toLowerCase()) {
-            case "en": return "English";
-            case "es": return "Spanish";
-            case "fr": return "French";
-            case "de": return "German";
-            case "it": return "Italian";
-            case "pt": return "Portuguese";
-            case "ru": return "Russian";
-            case "ja": return "Japanese";
-            case "ko": return "Korean";
-            case "zh": return "Chinese";
-            case "ar": return "Arabic";
-            case "hi": return "Hindi";
-            case "und": return "Unknown";
-            default: return languageCode.toUpperCase();
-        }
+        return switch (languageCode.toLowerCase()) {
+            case "en" -> "English";
+            case "es" -> "Spanish";
+            case "fr" -> "French";
+            case "de" -> "German";
+            case "it" -> "Italian";
+            case "pt" -> "Portuguese";
+            case "ru" -> "Russian";
+            case "ja" -> "Japanese";
+            case "ko" -> "Korean";
+            case "zh" -> "Chinese";
+            case "ar" -> "Arabic";
+            case "hi" -> "Hindi";
+            case "und" -> "Unknown";
+            default -> languageCode.toUpperCase();
+        };
     }
 
     // Builder Pattern
