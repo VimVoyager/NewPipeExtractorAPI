@@ -10,6 +10,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +23,8 @@ import java.util.List;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class DashManifestConfigDTO {
+
+    private static final Logger logger = LoggerFactory.getLogger(DashManifestConfigDTO.class);
 
     /**
      * Type of DASH manifest (typically "static" for VOD content).
@@ -139,7 +143,7 @@ public class DashManifestConfigDTO {
                     videoStreams.add(VideoStreamMetadataDTO.from(videoStream, videoIndex++));
                 } catch (Exception e) {
                     // Log and skip invalid streams
-                    System.err.println("Skipping invalid video stream: " + e.getMessage());
+                    logger.error("Skipping invalid video stream: {}", e.getMessage());
                 }
             }
         }
@@ -154,7 +158,7 @@ public class DashManifestConfigDTO {
                     audioStreams.add(AudioStreamMetadataDTO.from(audioStream, audioIndex++));
                 } catch (Exception e) {
                     // Log and skip invalid streams
-                    System.err.println("Skipping invalid audio stream: " + e.getMessage());
+                    logger.error("Skipping invalid audio stream {}", e.getMessage());
                 }
             }
         }
@@ -169,7 +173,7 @@ public class DashManifestConfigDTO {
                     subtitleStreams.add(SubtitleMetadataDTO.from(subtitleStream, subtitleIndex++));
                 } catch (Exception e) {
                     // Log and skip invalid streams
-                    System.err.println("Skipping invalid subtitle stream: " + e.getMessage());
+                    logger.error("Skipping invalid subtitle stream {}", e.getMessage());
                 }
             }
         }
@@ -234,7 +238,7 @@ public class DashManifestConfigDTO {
             try {
                 videoStreamDTOs.add(VideoStreamMetadataDTO.from(stream, videoIndex++));
             } catch (Exception e) {
-                System.err.println("Skipping invalid video stream: " + e.getMessage());
+                logger.error("Skipping invalid video stream: {}", e.getMessage());
             }
         }
         config.setVideoStreams(videoStreamDTOs);
@@ -246,7 +250,7 @@ public class DashManifestConfigDTO {
             try {
                 audioStreamDTOs.add(AudioStreamMetadataDTO.from(stream, audioIndex++));
             } catch (Exception e) {
-                System.err.println("Skipping invalid audio stream: " + e.getMessage());
+                 logger.error("Skipping invalid audio stream {}", e.getMessage());
             }
         }
         config.setAudioStreams(audioStreamDTOs);
@@ -258,7 +262,7 @@ public class DashManifestConfigDTO {
             try {
                 subtitleStreamDTOs.add(SubtitleMetadataDTO.from(stream, subtitleIndex++));
             } catch (Exception e) {
-                System.err.println("Skipping invalid subtitle stream: " + e.getMessage());
+                logger.error("Skipping invalid subtitle stream {}", e.getMessage());
             }
         }
         config.setSubtitleStreams(subtitleStreamDTOs);
