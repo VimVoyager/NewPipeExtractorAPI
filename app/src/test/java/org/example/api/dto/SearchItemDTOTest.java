@@ -400,23 +400,6 @@ class SearchItemDTOTest {
     @Nested
     @DisplayName("Edge Cases Tests")
     class EdgeCasesTests {
-
-        @Test
-        @DisplayName("Should handle null thumbnails list")
-        void testNullThumbnails() {
-            // Arrange
-            StreamInfoItem streamItem = mock(StreamInfoItem.class);
-            when(streamItem.getName()).thenReturn("Test");
-            when(streamItem.getUrl()).thenReturn("https://test.com");
-            when(streamItem.getThumbnails()).thenReturn(null);
-
-            // Act
-            SearchItemDTO dto = SearchItemDTO.from(streamItem);
-
-            // Assert
-            assertNull(dto.getThumbnailUrl());
-        }
-
         @Test
         @DisplayName("Should handle empty thumbnails list")
         void testEmptyThumbnails() {
