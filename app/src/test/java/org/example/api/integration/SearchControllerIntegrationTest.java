@@ -3,7 +3,6 @@ package org.example.api.integration;
 import org.example.api.dto.SearchItemDTO;
 import org.example.api.dto.SearchPageDTO;
 import org.example.api.dto.SearchResultDTO;
-import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
