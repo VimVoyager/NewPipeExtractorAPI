@@ -44,6 +44,7 @@ public class SearchController {
             @RequestParam(name = "sortFilter", required = false) String sortFilter,
             @RequestParam(name = "contentFilters", required = false) String contentFilters
     ) {
+        searchString = searchString.trim();
         logger.info("Search request received for: {}", searchString);
 
         ValidationUtils.requireNonEmpty(searchString, "searchString");
