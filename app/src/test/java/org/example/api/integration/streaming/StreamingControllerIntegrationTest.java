@@ -1,5 +1,6 @@
-package org.example.api.integration;
+package org.example.api.integration.streaming;
 
+import org.example.api.integration.BaseIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
