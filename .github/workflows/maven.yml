@@ -183,29 +183,39 @@ jobs:
     needs: [unit-tests, integration-tests]
     runs-on: ubuntu-latest
     if: always()
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download unit test results
         uses: actions/download-artifact@v4
         with:
           name: unit-test-results
           path: unit-test-results
+        continue-on-error: true
       
       - name: Download integration test results
         uses: actions/download-artifact@v4
         with:
           name: integration-test-results
           path: integration-test-results
+        continue-on-error: true
       
-      - name: Publish combined test report
+      - name: Publish test report
         uses: dorny/test-reporter@v1
+        if: always()
         with:
-          name: All Test Results
+          name: Test Results
           path: |
             unit-test-results/**/*.xml
             integration-test-results/**/*.xml
           reporter: java-junit
-          fail-on-error: true
+          fail-on-error: false
       
       - name: Comment test results on PR
         if: github.event_name == 'pull_request'
@@ -215,7 +225,7 @@ jobs:
             unit-test-results/**/*.xml
             integration-test-results/**/*.xml
           comment_mode: always
-          check_name: Complete Test Results
+          check_name: Test Results Summary
 
   all-checks-passed:
     name: All Checks Passed
@@ -226,9 +236,9 @@ jobs:
     steps:
       - name: Check all jobs status
         run: |
-          if [ "${{ needs.unit-tests.result }}" != "success" ] || \
-             [ "${{ needs.integration-tests.result }}" != "success" ] || \
-             [ "${{ needs.code-coverage.result }}" != "success" ]; then
+          if [ "Unit tests: ${{ needs.unit-tests.result }}" != "success" ] || \
+             [ "Integration tests: ${{ needs.integration-tests.result }}" != "success" ] || \
+             [ "Code coverage: ${{ needs.code-coverage.result }}" != "success" ]; then
             echo "One or more required checks failed"
             exit 1
           fi
