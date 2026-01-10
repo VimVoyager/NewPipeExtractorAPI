@@ -70,7 +70,7 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
     @DisplayName("Get stream info should complete within timeout")
     void getStreamInfo_shouldCompleteWithinTimeout() throws Exception {
-        String response = getResponse("", TEST_VIDEO_ID);
+        String response = getResponse("streaminfo", TEST_VIDEO_ID);
         assertThat(response).isNotNull();
 
         logger.info("Stream info completed within timeout (using {})",
@@ -240,7 +240,7 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Video ID should be properly URL encoded")
     void getStreamInfo_shouldHandleUrlEncoding() throws Exception {
-        String response = getResponse("", TEST_VIDEO_ID);
+        String response = getResponse("streaminfo", TEST_VIDEO_ID);
         assertThat(response).isNotNull();
 
         logger.info("Video ID URL encoding works correctly");
@@ -315,8 +315,8 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Duplicate requests should return same data")
     void duplicateRequests_shouldReturnSameData() throws Exception {
-        String response1 = getResponse("", TEST_VIDEO_ID);
-        String response2 = getResponse("", TEST_VIDEO_ID);
+        String response1 = getResponse("streaminfo", TEST_VIDEO_ID);
+        String response2 = getResponse("streaminfo", TEST_VIDEO_ID);
 
         assertThat(response1).isNotNull();
         assertThat(response2).isNotNull();
