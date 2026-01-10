@@ -6,13 +6,17 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Java CI - Tests
+name: Java and maven CI
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
+defaults:
+  run:
+    working-directory: ./app
 
 jobs:
   build:
@@ -22,12 +26,14 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
         cache: 'maven'
+        cache-dependency-path: 'app/pom.xml'
     
     - name: Build project
       run: mvn clean compile -DskipTests -B
@@ -40,12 +46,14 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
         cache: 'maven'
+        cache-dependency-path: 'app/pom.xml'
 
     - name: Run unit tests
       run: mvn test
@@ -55,7 +63,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: unit-test-results
-        path: '**/target/surefire-reports/'
+        path: 'app/**/target/surefire-reports/'
         retention-days: 7
 
   integration-tests:
@@ -82,7 +90,7 @@ jobs:
        uses: actions/upload-artifact@v4
        with:
          name: integration-test-results
-         path: '**/target/failsafe-reports/'
+         path: 'app/**/target/failsafe-reports/'
          retention-days: 7
 
   code-coverage:
@@ -100,6 +108,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
+          cache-dependency-path: 'app/pom.xml'
       
       - name: Generate coverage report
         run: mvn verify jacoco:report
@@ -108,7 +117,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: '**/target/site/jacoco/'
+          path: 'app/**/target/site/jacoco/'
           retention-days: 30
       
       - name: Check coverage threshold
@@ -129,6 +138,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
+          cache-dependency-path: 'app/pom.xml'
       
       # Optional: Add Checkstyle
       - name: Run Checkstyle
