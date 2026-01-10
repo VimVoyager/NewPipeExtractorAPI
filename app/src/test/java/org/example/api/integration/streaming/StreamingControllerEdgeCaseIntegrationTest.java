@@ -53,6 +53,9 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
         } else {
             // Local: Make real HTTP request
             String url = "%s%s?id=%s".formatted(getBaseUrl(), endpoint, videoId);
+            if (endpoint.equals("streaminfo")) {
+                url ="%s%s?id%s".formatted(getBaseUrl(), "", videoId);
+            }
             logger.debug("Making real API call to: {}", url);
 
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
@@ -101,7 +104,7 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
         for (int i = 0; i < threadCount; i++) {
             threads[i] = new Thread(() -> {
                 try {
-                    String response = getResponse("", TEST_VIDEO_ID);
+                    String response = getResponse("streaminfo", TEST_VIDEO_ID);
                     if (response != null && !response.isEmpty()) {
                         successCount.incrementAndGet();
                     }

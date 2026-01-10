@@ -69,6 +69,9 @@ class StreamingControllerIntegrationTest extends BaseIntegrationTest {
         } else {
             // Local: Make real HTTP request
             String url = "%s%s?id=%s".formatted(getBaseUrl(), endpoint, videoId);
+            if (endpoint.equals("streaminfo")) {
+                url ="%s%s?id%s".formatted(getBaseUrl(), "", videoId);
+            }
             logger.debug("Making real API call to: {}", url);
 
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
