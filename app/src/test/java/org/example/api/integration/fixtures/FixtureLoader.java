@@ -89,7 +89,6 @@ public class FixtureLoader {
      */
     public static String getFixturePath(String endpoint) {
         // DASH endpoint returns XML, others return JSON
-        if (endpoint
         String extension = "dash".equals(endpoint) ? "xml" : "json";
 
         return getFixturePath(endpoint, extension);
