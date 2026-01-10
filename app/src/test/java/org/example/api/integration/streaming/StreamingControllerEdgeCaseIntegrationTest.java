@@ -46,8 +46,7 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
     private String getResponse(String endpoint, String videoId) throws Exception {
         if (isCI) {
             // In CI: Load from fixture
-            String fixtureType = getFixtureType(endpoint);
-            String fixturePath = FixtureLoader.getFixturePath(videoId, fixtureType);
+            String fixturePath = FixtureLoader.getFixturePath(endpoint);
 
             logger.debug("Loading fixture for endpoint '{}': {}", endpoint, fixturePath);
             return FixtureLoader.loadFixture(fixturePath);
@@ -60,23 +59,6 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             return response.getBody();
         }
-    }
-
-    /**
-     * Map endpoint path to fixture type directory.
-     */
-    private String getFixtureType(String endpoint) {
-        return switch (endpoint) {
-            case "" -> "streaminfo";
-            case "/dash" -> "dash";
-            case "/video" -> "video";
-            case "/audio" -> "audio";
-            case "/thumbnails" -> "thumbnails";
-            case "/description" -> "description";
-            case "/details" -> "details";
-            case "/related" -> "related";
-            default -> throw new IllegalArgumentException("Unknown endpoint: %s".formatted(endpoint));
-        };
     }
 
     // ========== Performance Tests ==========

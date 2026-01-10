@@ -73,26 +73,24 @@ public class FixtureLoader {
     /**
      * Get the fixture file path for a video ID and endpoint.
      *
-     * @param videoId The YouTube video ID
      * @param endpoint The endpoint being tested (e.g., "streaminfo", "audio", "dash")
      * @param extension The file extension ("json" or "xml")
      * @return The fixture file path
      */
-    public static String getFixturePath(String videoId, String endpoint, String extension) {
-        return String.format("%s/%s.%s", endpoint, videoId, extension);
+    public static String getFixturePath(String endpoint, String extension) {
+        return String.format("%s.%s", endpoint, extension);
     }
 
     /**
      * Get the fixture file path for a video ID and endpoint (defaults to JSON).
      *
-     * @param videoId The YouTube video ID
      * @param endpoint The endpoint being tested
      * @return The fixture file path
      */
-    public static String getFixturePath(String videoId, String endpoint) {
+    public static String getFixturePath(String endpoint) {
         // DASH endpoint returns XML, others return JSON
         String extension = "dash".equals(endpoint) ? "xml" : "json";
-        return getFixturePath(videoId, endpoint, extension);
+        return getFixturePath(endpoint, extension);
     }
 
     /**

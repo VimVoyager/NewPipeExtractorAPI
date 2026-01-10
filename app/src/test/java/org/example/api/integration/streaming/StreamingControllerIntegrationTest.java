@@ -53,8 +53,7 @@ class StreamingControllerIntegrationTest extends BaseIntegrationTest {
     private String getResponse(String endpoint, String videoId) throws Exception {
         if (isCI) {
             // In CI: Load from fixture
-            String fixtureType = getFixtureType(endpoint);
-            String fixturePath = FixtureLoader.getFixturePath(videoId, fixtureType);
+            String fixturePath = FixtureLoader.getFixturePath(endpoint);
 
             logger.debug("Loading fixture for endpoint '{}': {}", endpoint, fixturePath);
 
@@ -76,25 +75,6 @@ class StreamingControllerIntegrationTest extends BaseIntegrationTest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             return response.getBody();
         }
-    }
-
-    /**
-     * Map endpoint path to fixture type directory.
-     */
-    private String getFixtureType(String endpoint) {
-        return switch (endpoint) {
-            case "" -> "streaminfo";
-            case "/audio" -> "audio";
-            case "/video" -> "video";
-            case "/dash" -> "dash";
-            case "/thumbnails" -> "thumbnails";
-            case "/subtitles" -> "subtitles";
-            case "/segments" -> "segments";
-            case "/description" -> "description";
-            case "/details" -> "details";
-            case "/related" -> "related";
-            default -> throw new IllegalArgumentException("Unknown endpoint: %s".formatted(endpoint));
-        };
     }
 
     // ========== Basic Stream Info Tests ==========
