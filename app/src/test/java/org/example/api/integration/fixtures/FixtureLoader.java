@@ -82,14 +82,16 @@ public class FixtureLoader {
     }
 
     /**
-     * Get the fixture file path for a video ID and endpoint (defaults to JSON).
+     * Get the fixture file path for an endpoint (defaults to JSON).
      *
      * @param endpoint The endpoint being tested
      * @return The fixture file path
      */
     public static String getFixturePath(String endpoint) {
         // DASH endpoint returns XML, others return JSON
+        if (endpoint
         String extension = "dash".equals(endpoint) ? "xml" : "json";
+
         return getFixturePath(endpoint, extension);
     }
 

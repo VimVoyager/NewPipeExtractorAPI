@@ -81,7 +81,7 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
     @Timeout(value = 20, unit = TimeUnit.SECONDS)
     @DisplayName("DASH manifest generation should complete within timeout")
     void getDashManifest_shouldCompleteWithinTimeout() throws Exception {
-        String response = getResponse("/dash", TEST_VIDEO_ID);
+        String response = getResponse("dash", TEST_VIDEO_ID);
         assertThat(response).isNotNull();
 
         logger.info("DASH manifest completed within timeout (using {})",
@@ -126,7 +126,7 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("DASH manifest should not be empty")
     void getDashManifest_shouldNotBeEmpty() throws Exception {
-        String manifest = getResponse("/dash", TEST_VIDEO_ID);
+        String manifest = getResponse("dash", TEST_VIDEO_ID);
 
         assertThat(manifest)
                 .isNotNull()
@@ -139,7 +139,7 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("DASH manifest should have reasonable size")
     void getDashManifest_shouldHaveReasonableSize() throws Exception {
-        String manifest = getResponse("/dash", TEST_VIDEO_ID);
+        String manifest = getResponse("dash", TEST_VIDEO_ID);
 
         // Manifest should be between 1KB and 100KB (reasonable range)
         assertThat(manifest.length()).isBetween(1000, 100000);
@@ -150,7 +150,7 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("DASH manifest should contain BaseURL elements")
     void getDashManifest_shouldContainBaseUrls() throws Exception {
-        String manifest = getResponse("/dash", TEST_VIDEO_ID);
+        String manifest = getResponse("dash", TEST_VIDEO_ID);
         assertThat(manifest).contains("<BaseURL>");
 
         logger.info("DASH manifest contains BaseURL elements");
@@ -159,7 +159,7 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("DASH manifest should have proper namespace")
     void getDashManifest_shouldHaveProperNamespace() throws Exception {
-        String manifest = getResponse("/dash", TEST_VIDEO_ID);
+        String manifest = getResponse("dash", TEST_VIDEO_ID);
         assertThat(manifest).contains("xmlns=\"urn:mpeg:dash:schema:mpd:");
 
         logger.info("DASH manifest has proper MPEG-DASH namespace");

@@ -82,7 +82,7 @@ class StreamingControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Get stream info with valid ID should return complete StreamInfo")
     void getStreamInfo_withValidId_shouldReturnStreamInfo() throws Exception {
-        String response = getResponse("", TEST_VIDEO_ID);
+        String response = getResponse("streaminfo", TEST_VIDEO_ID);
 
         // Verify response structure
         assertThat(response)
@@ -195,7 +195,7 @@ class StreamingControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Get DASH manifest should return valid XML")
     void getDashManifest_withValidId_shouldReturnValidXml() throws Exception {
-        String manifest = getResponse("/dash", TEST_VIDEO_ID);
+        String manifest = getResponse("dash", TEST_VIDEO_ID);
 
         assertThat(manifest)
                 .isNotNull()
@@ -211,7 +211,7 @@ class StreamingControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("DASH manifest should contain video and audio adaptation sets")
     void getDashManifest_shouldContainVideoAndAudio() throws Exception {
-        String manifest = getResponse("/dash", TEST_VIDEO_ID);
+        String manifest = getResponse("dash", TEST_VIDEO_ID);
 
         assertThat(manifest).contains("mimeType=\"video/");
         assertThat(manifest).contains("mimeType=\"audio/");
@@ -222,7 +222,7 @@ class StreamingControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("DASH manifest should be parseable XML")
     void getDashManifest_shouldBeParseableXml() throws Exception {
-        String manifest = getResponse("/dash", TEST_VIDEO_ID);
+        String manifest = getResponse("dash", TEST_VIDEO_ID);
 
         assertThat(manifest).isNotNull();
         org.assertj.core.api.Assertions.assertThatCode(() -> {
