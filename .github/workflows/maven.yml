@@ -84,6 +84,8 @@ jobs:
          
      - name: Run integration tests
        run: mvn verify -DskipUnitTests=true
+       env:
+        SPRING_PROFILES_ACTIVE: ci
 
      - name: Upload integration test results
        if: always()
