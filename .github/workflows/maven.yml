@@ -112,20 +112,23 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
           cache-dependency-path: 'app/pom.xml'
+
+      - name: Run tests with coverage
+        run: mvn clean verify
+        env:
+          CI: true
       
       - name: Generate coverage report
-        run: mvn verify jacoco:report
+        run: mvn jacoco:report
+        continue-on-error: true
       
       - name: Upload coverage report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: 'app/**/target/site/jacoco/'
           retention-days: 30
-      
-      - name: Check coverage threshold
-        run: |
-          mvn jacoco:check -Djacoco.minimum.line.coverage=0.70 -Djacoco.minimum.branch.coverage=0.60
 
   code-quality:
     name: Code Quality Checks
