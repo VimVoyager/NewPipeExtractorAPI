@@ -1,7 +1,5 @@
 package org.example.api.integration.fixtures;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +17,6 @@ import java.nio.charset.StandardCharsets;
  */
 public class FixtureLoader {
     private static final Logger logger = LoggerFactory.getLogger(FixtureLoader.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Check if we're running in a CI environment.
@@ -36,7 +33,7 @@ public class FixtureLoader {
         if (isCi) {
             logger.info("Running in CI environment - will use fixtures");
         } else {
-            logger.info("Running locally - will use real YouTube API");
+            logger.debug("Running locally - will use real New Pipe Extractor");
         }
 
         return isCi;
@@ -44,6 +41,8 @@ public class FixtureLoader {
 
     /**
      * Load a fixture file as a String.
+     *
+     * Supports both JSON and XML fixtures.
      *
      * @param fixturePath Path relative to src/test/resources/fixtures/
      * @return The fixture content as a String
@@ -56,7 +55,13 @@ public class FixtureLoader {
         InputStream is = FixtureLoader.class.getResourceAsStream(fullPath);
 
         if (is == null) {
-            throw new IOException("Fixture not found: %s\nMake sure the fixture file exists in src/test/resources/fixtures/".formatted(fullPath));
+            String errorMsg = String.format(
+                    "Fixture not found: %s\n" +
+                            "Make sure the fixture file exists in src/test/resources/fixtures/\n" +
+                            "Expected path: src/test/resources%s",
+                    fullPath, fullPath
+            );
+            throw new IOException(errorMsg);
         }
 
         String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
@@ -66,22 +71,28 @@ public class FixtureLoader {
     }
 
     /**
-     * Load a fixture file as JSON.
-     */
-    public static JsonNode loadFixtureAsJson(String fixturePath) throws IOException {
-        String content = loadFixture(fixturePath);
-        return objectMapper.readTree(content);
-    }
-
-    /**
-     * Get the fixture path for a video ID.
+     * Get the fixture file path for a video ID and endpoint.
      *
      * @param videoId The YouTube video ID
      * @param endpoint The endpoint being tested (e.g., "streaminfo", "audio", "dash")
+     * @param extension The file extension ("json" or "xml")
+     * @return The fixture file path
+     */
+    public static String getFixturePath(String videoId, String endpoint, String extension) {
+        return String.format("%s/%s.%s", endpoint, videoId, extension);
+    }
+
+    /**
+     * Get the fixture file path for a video ID and endpoint (defaults to JSON).
+     *
+     * @param videoId The YouTube video ID
+     * @param endpoint The endpoint being tested
      * @return The fixture file path
      */
     public static String getFixturePath(String videoId, String endpoint) {
-        return String.format("%s/%s.json", endpoint, videoId);
+        // DASH endpoint returns XML, others return JSON
+        String extension = "dash".equals(endpoint) ? "xml" : "json";
+        return getFixturePath(videoId, endpoint, extension);
     }
 
     /**
@@ -90,6 +101,16 @@ public class FixtureLoader {
     public static boolean fixtureExists(String videoId, String endpoint) {
         String path = "/fixtures/%s".formatted(getFixturePath(videoId, endpoint));
         InputStream is = FixtureLoader.class.getResourceAsStream(path);
-        return is != null;
+        boolean exists = is != null;
+
+        if (exists) {
+            try {
+                is.close();
+            } catch (IOException e) {
+                // Ignore
+            }
+        }
+
+        return exists;
     }
 }
