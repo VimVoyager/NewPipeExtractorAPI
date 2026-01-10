@@ -205,7 +205,7 @@ curl http://localhost:8080/api/v1/streams?id=dQw4w9WgXcQ
 
 ## Testing
 
-### Run All Tests
+### Run unit Tests
 
 ```bash
 mvn test
@@ -228,6 +228,12 @@ mvn test -Dtest=StreamingControllerTest#testGetStreamInfoSuccess
 mvn test jacoco:report
 
 # View report at: target/site/jacoco/index.html
+```
+
+### Run integration tests
+
+```bash
+mvn verify
 ```
 
 ## Authors
