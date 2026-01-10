@@ -1,6 +1,8 @@
 package org.example.api.integration.streaming;
 
 import org.example.api.integration.BaseIntegrationTest;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +18,12 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Integration tests for StreamingController endpoints.
+ *
+ * NOTE: In CI environments, these tests are SKIPPED because YouTube blocks datacenter IPs.
+ * They run normally in local development.
+ */
 public class StreamingControllerIntegrationTest extends BaseIntegrationTest {
 
     @LocalServerPort
@@ -29,6 +37,11 @@ public class StreamingControllerIntegrationTest extends BaseIntegrationTest {
 
     private String getBaseUrl() {
         return "http://localhost:%d/api/v1/streams".formatted(port);
+    }
+
+    @BeforeEach
+    void skipInCI() {
+        Assumptions.assumeFalse(isCI, "Streaming tests skipped in CI - YouTube blocks datacenter IPs");
     }
 
     // ========== Basic Stream Info Tests ==========

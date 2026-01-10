@@ -1,9 +1,7 @@
 package org.example.api.integration.streaming;
 
 import org.example.api.integration.BaseIntegrationTest;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -26,6 +24,11 @@ class StreamingControllerEdgeCaseIntegrationTest extends BaseIntegrationTest {
 
     private String getBaseUrl() {
         return "http://localhost:%d/api/v1/streams".formatted(port);
+    }
+
+    @BeforeEach
+    void skipInCI() {
+        Assumptions.assumeFalse(isCI, "Streaming tests skipped in CI - YouTube blocks datacenter IPs");
     }
 
     // ========== Performance Tests ==========
