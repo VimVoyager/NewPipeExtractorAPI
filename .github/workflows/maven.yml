@@ -234,6 +234,9 @@ jobs:
     if: always()
     
     steps:
+      - name: Show Current Working Directory
+        run: pwd
+
       - name: Check all jobs status
         run: |
           if [ "${{ needs.unit-tests.result }}" != "success" ] || \
