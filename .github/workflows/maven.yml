@@ -14,10 +14,6 @@ on:
   pull_request:
     branches: [ "main" ]
 
-#defaults:
-#  run:
-#    working-directory: app/
-
 jobs:
   build:
     name: Build
@@ -241,14 +237,10 @@ jobs:
     if: always()
     
     steps:
-      - name: Show Current Working Directory
-        run: pwd
-
       - name: Check all jobs status
         run: |
           if [ "${{ needs.unit-tests.result }}" != "success" ] || \
              [ "${{ needs.integration-tests.result }}" != "success" ]; then
-#             [ "${{ needs.code-coverage.result }}" != "success" ]; then
             echo "One or more required checks failed"
             exit 1
           fi
