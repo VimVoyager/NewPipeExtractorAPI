@@ -63,7 +63,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: unit-test-results
-        path: 'app/**/target/surefire-reports/'
+        path: 'app/target/surefire-reports/*Test.xml'
         retention-days: 7
 
   integration-tests:
@@ -93,7 +93,7 @@ jobs:
        uses: actions/upload-artifact@v4
        with:
          name: integration-test-results
-         path: 'app/**/target/failsafe-reports/'
+         path: 'app/target/failsafe-reports/*IntegrationTest.xml'
          retention-days: 7
 
   code-coverage:
@@ -127,7 +127,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: 'app/**/target/site/jacoco/'
+          path: 'app//target/site/jacoco/'
           retention-days: 30
 
   code-quality:
@@ -236,9 +236,9 @@ jobs:
     steps:
       - name: Check all jobs status
         run: |
-          if [ "Unit tests: ${{ needs.unit-tests.result }}" != "success" ] || \
-             [ "Integration tests: ${{ needs.integration-tests.result }}" != "success" ] || \
-             [ "Code coverage: ${{ needs.code-coverage.result }}" != "success" ]; then
+          if [ "${{ needs.unit-tests.result }}" != "success" ] || \
+             [ "${{ needs.integration-tests.result }}" != "success" ] || \
+             [ "${{ needs.code-coverage.result }}" != "success" ]; then
             echo "One or more required checks failed"
             exit 1
           fi
