@@ -2,6 +2,7 @@ package org.example.api.service;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import org.example.api.exception.ExtractionException;
 import org.example.api.model.Error;
 import org.example.api.utils.SerializationUtils;
 import org.schabi.newpipe.extractor.NewPipe;
@@ -15,6 +16,8 @@ import org.schabi.newpipe.extractor.kiosk.KioskInfo;
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 import org.schabi.newpipe.extractor.stream.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -24,6 +27,7 @@ import java.util.Map;
 
 @Service
 public class RestService {
+    private static final Logger logger = LoggerFactory.getLogger(VideoStreamingService.class);
     private final ObjectMapper objectMapper;
 
     public RestService() {
@@ -143,13 +147,13 @@ public class RestService {
     }
 
 
-    public String getCommentsInfo(String url) throws Exception {
+    public CommentsInfo getCommentsInfo(String url) throws Exception {
         try {
-            CommentsInfo info = CommentsInfo.getInfo(url);
-            return objectMapper.writeValueAsString(info);
+            logger.info("Extracting comments for URL: {}", url);
+            return CommentsInfo.getInfo(url);
         } catch (Exception e) {
-            e.printStackTrace();
-            return getError(e);
+            logger.error("Failed to extract comments for URL: {}", url, e);
+            throw new ExtractionException("Failed to retrieve comments information:", e);
         }
     }
 

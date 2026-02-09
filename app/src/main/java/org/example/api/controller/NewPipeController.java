@@ -1,6 +1,9 @@
 package org.example.api.controller;
 
 import org.example.api.service.RestService;
+import org.example.api.utils.ValidationUtils;
+import org.schabi.newpipe.extractor.comments.CommentsInfo;
+import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +39,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/v1")
 public class NewPipeController {
+    private static final String YOUTUBE_URL = "https://www.youtube.com/watch?v=";
     private static final Logger logger = LoggerFactory.getLogger(NewPipeController.class);
     private final RestService restService;
 
@@ -297,35 +301,15 @@ public class NewPipeController {
     }
 
     @GetMapping("/comments")
-    public ResponseEntity<?> getComments(@RequestParam(name = "url") String url) throws Exception {
-        try {
-            logger.info("Retrieving comments info for url: {}", url);
+    public ResponseEntity<?> getComments(@RequestParam(name = "id") String id) throws Exception {
+        logger.info("Retrieving comments info for ID: {}", id);
 
-            if (url == null || url.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "URL is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
 
-            String commentsInfoJson = restService.getCommentsInfo(url);
+        CommentsInfo comments = restService.getCommentsInfo(url);
 
-            if (commentsInfoJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving comments info");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(commentsInfoJson);
-        } catch (Exception e) {
-            logger.error("Error retrieving comments info for url: {}", url, e);
-
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving comments info",
-                            "details", e.getMessage()
-                    ));
-        }
+        return ResponseEntity.ok(comments);
     }
 
     @GetMapping("/comments/page")
