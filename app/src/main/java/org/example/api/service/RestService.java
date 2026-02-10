@@ -157,16 +157,16 @@ public class RestService {
         }
     }
 
-    public String getCommentsPage(String url, String pageUrl) throws Exception {
+    public InfoItemsPage<CommentsInfoItem> getCommentsPage(String url, String pageUrl) throws Exception {
         try {
             //TODO optimize this. init page is fetched every time
+            logger.info("Extracting comments page for URL: {}", url);
             CommentsInfo info = CommentsInfo.getInfo(url);
             Page pageInstance = new Page(pageUrl);
-            InfoItemsPage<CommentsInfoItem> page = CommentsInfo.getMoreItems(info, pageInstance);
-            return objectMapper.writeValueAsString(page);
+            return CommentsInfo.getMoreItems(info, pageInstance);
         } catch (Exception e) {
-            e.printStackTrace();
-            return getError(e);
+            logger.error("Failed to extract comments page for URL: {}", url, e);
+            throw new ExtractionException("Failed to retrieve comments page information:", e);
         }
     }
 

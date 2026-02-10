@@ -2,8 +2,9 @@ package org.example.api.controller;
 
 import org.example.api.service.RestService;
 import org.example.api.utils.ValidationUtils;
+import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
 import org.schabi.newpipe.extractor.comments.CommentsInfo;
-import org.schabi.newpipe.extractor.stream.StreamInfo;
+import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,7 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * REST controller for handling API requests for YouTube information from New Pipe Extractor.
@@ -313,48 +315,21 @@ public class NewPipeController {
     }
 
     @GetMapping("/comments/page")
-    public ResponseEntity getCommentsPage(
-            @RequestParam(name = "url") String url,
+    public ResponseEntity<?> getCommentsPage(
+            @RequestParam(name = "id") String id,
             @RequestParam(name = "pageUrl") String pageUrl
     ) throws Exception {
-        try {
-            logger.info("Retrieving comments page for url: {}, pageUrl: {}", url, pageUrl);
+        logger.info("Retrieving comments page for id: {}, pageUrl: {}", id, pageUrl);
 
-            if (url == null || url.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "URL is required"));
-            }
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
+        ValidationUtils.requireValidUrl(pageUrl);
 
-            if (pageUrl == null || pageUrl.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "Page URL is required"));
-            }
+        InfoItemsPage<CommentsInfoItem> commentsPageJson = restService.getCommentsPage(
+                url,
+                pageUrl
+        );
 
-            String commentsPageJson = restService.getCommentsPage(
-                    url,
-                    pageUrl
-            );
-
-            if (commentsPageJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving comments page");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(commentsPageJson);
-
-        } catch (Exception e) {
-            logger.error("Error retrieving comments page for url: {}, pageUrl: {}", url, pageUrl, e);
-
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving comments page",
-                            "details", e.getMessage()
-                    ));
-        }
-
+        return ResponseEntity.ok(commentsPageJson);
     }
 }
