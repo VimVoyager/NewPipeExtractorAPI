@@ -147,17 +147,17 @@ public class RestService {
     }
 
 
-    public CommentsInfo getCommentsInfo(String url) throws Exception {
+    public CommentsInfo getCommentsInfo(String url) throws ExtractionException {
         try {
             logger.info("Extracting comments for URL: {}", url);
             return CommentsInfo.getInfo(url);
         } catch (Exception e) {
             logger.error("Failed to extract comments for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve comments information:", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
-    public InfoItemsPage<CommentsInfoItem> getCommentsPage(String url, String pageUrl) throws Exception {
+    public InfoItemsPage<CommentsInfoItem> getCommentsPage(String url, String pageUrl) throws ExtractionException {
         try {
             //TODO optimize this. init page is fetched every time
             logger.info("Extracting comments page for URL: {}", url);
@@ -166,7 +166,7 @@ public class RestService {
             return CommentsInfo.getMoreItems(info, pageInstance);
         } catch (Exception e) {
             logger.error("Failed to extract comments page for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve comments page information:", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 

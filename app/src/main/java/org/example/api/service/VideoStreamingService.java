@@ -25,13 +25,13 @@ public class VideoStreamingService {
      * @return StreamInfo object with complete stream information
      * @throws ExtractionException if extraction fails
      */
-    public StreamInfo getStreamInfo(String url) {
+    public StreamInfo getStreamInfo(String url) throws ExtractionException {
         try {
             logger.info("Extracting stream info for URL: {}", url);
             return StreamInfo.getInfo(url);
         } catch (Exception e) {
             logger.error("Failed to extract stream info for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve stream information", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -42,13 +42,13 @@ public class VideoStreamingService {
      * @return List of audio streams
      * @throws ExtractionException if extraction fails
      */
-    public List<AudioStream> getAudioStreams(String url) {
+    public List<AudioStream> getAudioStreams(String url) throws ExtractionException{
         try {
             logger.info("Extracting audio streams for URL: {}", url);
             return StreamInfo.getInfo(url).getAudioStreams();
         } catch (Exception e) {
             logger.error("Failed to extract audio streams for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve audio streams", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -59,13 +59,13 @@ public class VideoStreamingService {
      * @return List of video streams
      * @throws ExtractionException if extraction fails
      */
-    public List<VideoStream> getVideoStreams(String url) {
+    public List<VideoStream> getVideoStreams(String url) throws ExtractionException {
         try {
             logger.info("Extracting video streams for URL: {}", url);
             return StreamInfo.getInfo(url).getVideoOnlyStreams();
         } catch (Exception e) {
             logger.error("Failed to extract video streams for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve video streams", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -76,7 +76,7 @@ public class VideoStreamingService {
      * @return DASH MPD URL string
      * @throws ExtractionException if extraction fails
      */
-    public String getDashMpdUrl(String url) {
+    public String getDashMpdUrl(String url) throws ExtractionException {
         try {
             logger.info("Extracting DASH MPD URL for: {}", url);
             String dashUrl = StreamInfo.getInfo(url).getDashMpdUrl();
@@ -84,7 +84,7 @@ public class VideoStreamingService {
             return dashUrl;
         } catch (Exception e) {
             logger.error("Failed to extract DASH MPD URL for: {}", url, e);
-            throw new ExtractionException("Failed to retrieve DASH MPD URL", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -95,13 +95,13 @@ public class VideoStreamingService {
      * @return List of subtitle streams
      * @throws ExtractionException if extraction fails
      */
-    public List<Image> getStreamThumbnails(String url) {
+    public List<Image> getStreamThumbnails(String url) throws ExtractionException {
         try {
             logger.info("Extracting stream thumbnails for URL: {}", url);
             return StreamInfo.getInfo(url).getThumbnails();
         } catch (Exception e) {
             logger.error("Failed to extract subtitle streams for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve subtitle streams", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -112,13 +112,13 @@ public class VideoStreamingService {
      * @return List of subtitle streams
      * @throws ExtractionException if extraction fails
      */
-    public List<SubtitlesStream> getSubtitleStreams(String url) {
+    public List<SubtitlesStream> getSubtitleStreams(String url) throws ExtractionException {
         try {
             logger.info("Extracting subtitle streams for URL: {}", url);
             return StreamInfo.getInfo(url).getSubtitles();
         } catch (Exception e) {
             logger.error("Failed to extract subtitle streams for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve subtitle streams", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -129,13 +129,13 @@ public class VideoStreamingService {
      * @return List of stream segments
      * @throws ExtractionException if extraction fails
      */
-    public List<StreamSegment> getStreamSegments(String url) {
+    public List<StreamSegment> getStreamSegments(String url) throws ExtractionException {
         try {
             logger.info("Extracting stream segments for URL: {}", url);
             return StreamInfo.getInfo(url).getStreamSegments();
         } catch (Exception e) {
             logger.error("Failed to extract stream segments for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve stream segments", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -146,13 +146,13 @@ public class VideoStreamingService {
      * @return List of preview framesets
      * @throws ExtractionException if extraction fails
      */
-    public List<Frameset> getPreviewFrames(String url) {
+    public List<Frameset> getPreviewFrames(String url) throws ExtractionException {
         try {
             logger.info("Extracting preview frames for URL: {}", url);
             return StreamInfo.getInfo(url).getPreviewFrames();
         } catch (Exception e) {
             logger.error("Failed to extract preview frames for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve preview frames", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -163,13 +163,13 @@ public class VideoStreamingService {
      * @return Description object
      * @throws ExtractionException if extraction fails
      */
-    public Description getStreamDescription(String url) {
+    public Description getStreamDescription(String url) throws ExtractionException {
         try {
             logger.info("Extracting stream description for URL: {}", url);
             return StreamInfo.getInfo(url).getDescription();
         } catch (Exception e) {
             logger.error("Failed to extract stream description for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve stream description", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -180,13 +180,13 @@ public class VideoStreamingService {
      * @return List of related items
      * @throws ExtractionException if extraction fails
      */
-    public List<InfoItem> getRelatedStreams(String url) {
+    public List<InfoItem> getRelatedStreams(String url) throws ExtractionException {
         try {
             logger.info("Extracting related streams for URL: {}", url);
             return StreamInfo.getInfo(url).getRelatedItems();
         } catch (Exception e) {
             logger.error("Failed to extract related streams for URL: {}", url, e);
-            throw new ExtractionException("Failed to retrieve related streams", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 }

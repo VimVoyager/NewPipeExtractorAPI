@@ -43,7 +43,7 @@ public class SearchService {
             String searchString,
             List<String> contentFilters,
             String sortFilter
-    ) {
+    ) throws ExtractionException {
         try {
             logger.info("Performing search for: {}", searchString);
 
@@ -68,7 +68,7 @@ public class SearchService {
             return dto;
         } catch (Exception e) {
             logger.error("Failed to perform search for: {}", searchString, e);
-            throw new ExtractionException("Failed to retrieve search results", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -87,7 +87,7 @@ public class SearchService {
             List<String> contentFilters,
             String sortFilter,
             String pageUrl
-    ) {
+    ) throws ExtractionException {
         try {
             logger.info("Retrieving search page for: {} with pageUrl: {}", searchString, pageUrl);
 
@@ -116,7 +116,7 @@ public class SearchService {
             return dto;
         } catch (Exception e) {
             logger.error("Failed to retrieve search page for: {} with pageUrl: {}", searchString, pageUrl, e);
-            throw new ExtractionException("Failed to retrieve search page", e);
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 

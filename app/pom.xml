@@ -63,6 +63,13 @@
             <version>3.0.3</version>
         </dependency>
 
+        <!-- Source: https://mvnrepository.com/artifact/tools.jackson.datatype/jackson-datatype-jsr310 -->
+        <dependency>
+            <groupId>tools.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>3.0.0-rc2</version>
+        </dependency>
+
         <!-- https://mvnrepository.com/artifact/com.squareup.okhttp3/okhttp -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
@@ -93,9 +100,10 @@
 
         <!-- https://mvnrepository.com/artifact/com.github.TeamNewPipe.NewPipeExtractor/NewPipeExtractor -->
         <dependency>
-            <groupId>com.github.TeamNewPipe.NewPipeExtractor</groupId>
+            <groupId>com.github.teamnewpipe</groupId>
             <artifactId>NewPipeExtractor</artifactId>
-            <version>v0.24.8</version>
+            <version>v0.25.0</version>
+            <scope>compile</scope>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.jspecify/jspecify -->
