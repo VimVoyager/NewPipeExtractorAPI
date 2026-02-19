@@ -1,5 +1,6 @@
 package org.example.api.controller;
 
+import org.example.api.dto.CommentsDTO;
 import org.example.api.service.RestService;
 import org.example.api.utils.ValidationUtils;
 import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
@@ -310,8 +311,9 @@ public class NewPipeController {
         ValidationUtils.requireValidUrl(url);
 
         CommentsInfo comments = restService.getCommentsInfo(url);
+        CommentsDTO.CommentsResponseDto dto = restService.mapCommentsToDto(comments);
 
-        return ResponseEntity.ok(comments);
+        return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/comments/page")
