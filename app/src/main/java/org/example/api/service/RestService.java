@@ -2,6 +2,7 @@ package org.example.api.service;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import org.example.api.dto.CommentsDTO;
 import org.example.api.exception.ExtractionException;
 import org.example.api.model.Error;
 import org.example.api.utils.SerializationUtils;
@@ -178,5 +179,67 @@ public class RestService {
         } catch (Exception ex) {
             return "{\"message\":\"Error serializing error response\"}";
         }
+    }
+
+    public CommentsDTO.CommentsResponseDto mapCommentsToDto(CommentsInfo info) {
+        List<CommentsDTO.CommentItemDto> items = info.getRelatedItems().stream()
+                .map(item -> {
+                    List<CommentsDTO.AvatarDto> thumbnails = item.getThumbnails().stream()
+                            .map(t -> new CommentsDTO.AvatarDto(t.getUrl(), t.getHeight(), t.getWidth()))
+                            .toList();
+
+                    List<CommentsDTO.AvatarDto> avatars = item.getUploaderAvatars().stream()
+                            .map(a -> new CommentsDTO.AvatarDto(a.getUrl(), a.getHeight(), a.getWidth()))
+                            .toList();
+
+                    CommentsDTO.RepliesDto replies = null;
+                    if (item.getReplies() != null) {
+                        replies = new CommentsDTO.RepliesDto(
+                                item.getReplies().getUrl(),
+                                item.getReplies().getId()
+                        );
+                    }
+
+                    CommentsDTO.UploadDateDto uploadDate = null;
+                    if (item.getUploadDate() != null) {
+                        uploadDate = new CommentsDTO.UploadDateDto(item.getUploadDate().isApproximation());
+                    }
+
+                    return new CommentsDTO.CommentItemDto(
+                            "COMMENT",
+                            item.getServiceId(),
+                            item.getUrl(),
+                            item.getName(),
+                            thumbnails,
+                            item.getCommentId(),
+                            item.getCommentText().getContent(),
+                            item.getCommentText().getType(),
+                            item.getUploaderName(),
+                            avatars,
+                            item.getUploaderUrl(),
+                            item.isUploaderVerified(),
+                            item.getTextualUploadDate(),
+                            uploadDate,
+                            item.getLikeCount(),
+                            item.getTextualLikeCount(),
+                            item.isHeartedByUploader(),
+                            item.isPinned(),
+                            item.getStreamPosition(),
+                            item.getReplyCount(),
+                            replies,
+                            item.isChannelOwner()
+                    );
+                })
+                .toList();
+
+        return new CommentsDTO.CommentsResponseDto(
+                info.getServiceId(),
+                info.getId(),
+                info.getUrl(),
+                info.getOriginalUrl(),
+                info.getName(),
+                List.of(),
+                items
+        );
     }
 }
