@@ -1,4 +1,4 @@
-package org.example.api.dto;
+package org.example.api.dto.search;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.schabi.newpipe.extractor.InfoItem;
@@ -6,9 +6,6 @@ import org.schabi.newpipe.extractor.channel.ChannelInfoItem;
 import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamType;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Data Transfer Object for individual search result items.

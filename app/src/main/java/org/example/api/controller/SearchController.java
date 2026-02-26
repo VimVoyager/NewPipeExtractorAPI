@@ -1,7 +1,7 @@
 package org.example.api.controller;
 
-import org.example.api.dto.SearchPageDTO;
-import org.example.api.dto.SearchResultDTO;
+import org.example.api.dto.search.SearchPageDTO;
+import org.example.api.dto.search.SearchResultDTO;
 import org.example.api.service.SearchService;
 import org.example.api.utils.ValidationUtils;
 import org.slf4j.Logger;

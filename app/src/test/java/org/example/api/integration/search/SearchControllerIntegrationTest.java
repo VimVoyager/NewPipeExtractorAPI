@@ -1,7 +1,7 @@
 package org.example.api.integration.search;
 
-import org.example.api.dto.SearchItemDTO;
-import org.example.api.dto.SearchResultDTO;
+import org.example.api.dto.search.SearchItemDTO;
+import org.example.api.dto.search.SearchResultDTO;
 import org.example.api.integration.BaseIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;

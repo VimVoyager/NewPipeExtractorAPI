@@ -1,8 +1,8 @@
 package org.example.api.service;
 
-import org.example.api.dto.SearchPageDTO;
-import org.example.api.dto.SearchResultDTO;
-import org.example.api.dto.SearchItemDTO;
+import org.example.api.dto.search.SearchPageDTO;
+import org.example.api.dto.search.SearchResultDTO;
+import org.example.api.dto.search.SearchItemDTO;
 import org.example.api.exception.ExtractionException;
 import org.schabi.newpipe.extractor.ListExtractor;
 import org.schabi.newpipe.extractor.NewPipe;

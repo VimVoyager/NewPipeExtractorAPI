@@ -1,26 +1,20 @@
 package org.example.api.service;
 
-import org.example.api.dto.SearchItemDTO;
-import org.example.api.dto.SearchPageDTO;
-import org.example.api.dto.SearchResultDTO;
+import org.example.api.dto.search.SearchPageDTO;
+import org.example.api.dto.search.SearchResultDTO;
 import org.example.api.exception.ExtractionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
-import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.ListExtractor;
 import org.schabi.newpipe.extractor.NewPipe;
-import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandlerFactory;
 import org.schabi.newpipe.extractor.search.SearchInfo;
-import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;

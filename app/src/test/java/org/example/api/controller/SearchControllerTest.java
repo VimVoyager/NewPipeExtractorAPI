@@ -2,10 +2,9 @@ package org.example.api.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.api.config.GlobalExceptionHandler;
-import org.example.api.dto.SearchPageDTO;
-import org.example.api.dto.SearchResultDTO;
+import org.example.api.dto.search.SearchPageDTO;
+import org.example.api.dto.search.SearchResultDTO;
 import org.example.api.exception.ExtractionException;
-import org.example.api.exception.ValidationException;
 import org.example.api.service.SearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

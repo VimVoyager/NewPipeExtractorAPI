@@ -1,4 +1,4 @@
-package org.example.api.dto;
+package org.example.api.dto.search;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.schabi.newpipe.extractor.ListExtractor;
