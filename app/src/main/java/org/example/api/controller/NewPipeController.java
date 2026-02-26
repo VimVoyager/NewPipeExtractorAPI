@@ -169,38 +169,6 @@ public class NewPipeController {
         }
     }
 
-    @GetMapping("/channels")
-    public ResponseEntity<?> getChannelInfo(@RequestParam(name = "url") String url) throws Exception {
-        try {
-            logger.info("Retrieving channel info for url: {}", url);
-
-            if (url == null || url.isEmpty()) {
-                return ResponseEntity
-                        .badRequest()
-                        .body(Map.of("message", "URL is required"));
-            }
-
-            String channelInfoJson = restService.getChannelInfo(url);
-
-            if (channelInfoJson.contains("\"message\"")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Error retrieving chanel info");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
-
-            return ResponseEntity.ok(channelInfoJson);
-        } catch (Exception e) {
-            logger.error("Error retrieving channel info for url: {}", url, e);
-
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "message", "Error retrieving channel info",
-                            "details", e.getMessage()
-                    ));
-        }
-    }
-
     @GetMapping("/kiosks")
     public ResponseEntity<?> getKioskIdsList(@RequestParam(name = "serviceId") int serviceId) throws Exception {
         try {

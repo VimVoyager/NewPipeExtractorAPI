@@ -10,7 +10,6 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
-import org.schabi.newpipe.extractor.channel.ChannelInfo;
 import org.schabi.newpipe.extractor.comments.CommentsInfo;
 import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 import org.schabi.newpipe.extractor.kiosk.KioskInfo;
@@ -28,7 +27,7 @@ import java.util.Map;
 
 @Service
 public class RestService {
-    private static final Logger logger = LoggerFactory.getLogger(VideoStreamingService.class);
+    private static final Logger logger = LoggerFactory.getLogger(RestService.class);
     private final ObjectMapper objectMapper;
 
     public RestService() {
@@ -53,7 +52,7 @@ public class RestService {
             }
 
             List<StreamingService> services = NewPipe.getServices();
-            System.out.println("Found " + services.size() + " services");
+            System.out.printf("Found %d services%n", services.size());
 
             // Create a simplified list of services
             List<Map<String, Object>> serviceList = new ArrayList<>();
@@ -93,22 +92,6 @@ public class RestService {
             return getError(e);
         }
     }
-
-    public String getChannelInfo(String url) throws Exception {
-        try {
-            ChannelInfo info = ChannelInfo.getInfo(url);
-            return objectMapper.writeValueAsString(info);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-//    public String getChannelPage(@NonNull String url, @NonNull String pageUrl) throws IOException, ExtractionException {
-//        StreamingService service = NewPipe.getServiceByUrl(url);
-//        InfoItemsPage<StreamInfoItem> page = ChannelInfo.getMoreItems(service, url, pageUrl);
-//        return objectManager.writeValueAsString(page);
-//    }
 
     public String getKioskInfo(int serviceId, String kioskId) throws Exception {
         try {
