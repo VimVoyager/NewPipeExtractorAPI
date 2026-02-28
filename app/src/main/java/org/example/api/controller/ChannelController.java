@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/channels")
 public class ChannelController {
@@ -42,12 +44,12 @@ public class ChannelController {
         return ResponseEntity.ok(channelDTO);
     }
 
-    @GetMapping("/{id}/tab")
+    @GetMapping("/tab")
     public ResponseEntity<ChannelTabDTO> getChannelTab(
-            @PathVariable String id,
+            @RequestParam(name = "id") String id,
             @RequestParam(name = "tab", defaultValue = ChannelTabs.VIDEOS) String tab
     ) throws ExtractionException {
-        logger.info("Fetching channel tab '{}' for id: {}", tab, id);
+        logger.info("Fetching channel tab '{}' for ID: {}", tab, id);
 
         String channelUrl = YOUTUBE_URL + id;
         ValidationUtils.requireValidUrl(channelUrl);
@@ -56,5 +58,31 @@ public class ChannelController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * Returns a subsequent page of channel tab items.
+     *
+     * <p>All three {@code nextPage.*} parameters must be taken verbatim from the
+     * {@code nextPage} object in the previous response — the body and ids are required
+     * by NewPipe to correctly make the continuation request and annotate returned items.</p>
+     *
+     * @param channelId  channel ID from the previous response's {@code channelId} field
+     * @param tab        tab type — must match the initial request
+     * @param pageUrl    from {@code nextPage.url}
+     * @param pageBody   from {@code nextPage.body} (Base64-encoded continuation token)
+     * @param pageIds    from {@code nextPage.ids} (["channelName", "channelUrl", "verifiedStatus"])
+     */
+    @GetMapping("/tab/page")
+    public ResponseEntity<ChannelTabDTO> getChannelTabPage(
+            @RequestParam(name = "channelId") String channelId,
+            @RequestParam(name = "tab", defaultValue = ChannelTabs.VIDEOS) String tab,
+            @RequestParam(name = "pageUrl") String pageUrl,
+            @RequestParam(name = "pageBody") String pageBody,
+            @RequestParam(name = "pageIds") List<String> pageIds
+    ) throws Exception {
+        logger.info("Retrieving channel tab '{}' page for channelId: {}", tab, channelId);
 
+        ChannelTabDTO result = channelTabService.getChannelTabPage(
+                channelId, tab, pageUrl, pageBody, pageIds);
+        return ResponseEntity.ok(result);
+    }
 }
