@@ -12,11 +12,11 @@ import org.schabi.newpipe.extractor.channel.tabs.ChannelTabExtractor;
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo;
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
-import org.schabi.newpipe.extractor.linkhandler.ListLinkHandlerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,14 +24,13 @@ import java.util.Optional;
  * Service for extracting paginated content from YouTube channel tabs via
  * NewPipe's {@link ChannelTabInfo} API.
  *
- * <p>Supported tab types (use the string constants from {@link ChannelTabs}):
+ * <p>Supported tab types (use the string constants from {@link ChannelTabs}):</p>
  * <ul>
  *   <li>{@code "videos"}      — regular uploads</li>
  *   <li>{@code "shorts"}      — YouTube Shorts</li>
  *   <li>{@code "livestreams"} — past and upcoming live streams</li>
- *   <li>{@code "playlists"}   — channel playlists (items are PlaylistInfoItems)</li>
+ *   <li>{@code "playlists"}   — channel playlists</li>
  * </ul>
- * </p>
  */
 @Service
 public class ChannelTabService {
@@ -40,39 +39,21 @@ public class ChannelTabService {
 
     /**
      * Fetches the first page of items from a given channel tab.
-     *
-     * <p>Strategy:
-     * <ol>
-     *   <li>Resolve the channel URL → {@link ChannelInfo} to get its {@code tabs} list.</li>
-     *   <li>Find the {@link ListLinkHandler} whose {@code contentFilters} match the tab type.</li>
-     *   <li>Get a {@link ChannelTabExtractor} from the service, call {@code fetchPage()},
-     *       then pass it to {@link ChannelTabInfo#getInfo(ChannelTabExtractor)}.</li>
-     * </ol>
-     * </p>
-     *
-     * @param channelUrl full YouTube channel URL (e.g. {@code https://www.youtube.com/@LinusTechTips})
-     * @param tab        tab type string — use {@link ChannelTabs} constants
-     *                   ({@code "videos"}, {@code "shorts"}, {@code "livestreams"}, {@code "playlists"})
-     * @param channelId  channel ID used for the response DTO (e.g. {@code @LinusTechTips})
-     * @return paginated {@link ChannelTabDTO}
-     * @throws ExtractionException if extraction or tab lookup fails
      */
-    public ChannelTabDTO getChannelTab(String channelUrl, String tab, String channelId) throws ExtractionException {
+    public ChannelTabDTO getChannelTab(String channelUrl, String tab, String channelId)
+            throws ExtractionException {
         try {
             logger.info("Fetching channel tab '{}' for URL: {}", tab, channelUrl);
 
-            // Get channel info to access its tab link handlers
             StreamingService service = NewPipe.getServiceByUrl(channelUrl);
             ChannelInfo channelInfo = ChannelInfo.getInfo(channelUrl);
 
-            // Find the matching tab handler
             ListLinkHandler tabHandler = findTabHandler(channelInfo.getTabs(), tab)
                     .orElseThrow(() -> new ExtractionException(
                             "Tab '%s' not found for channel '%s'. Available tabs: %s"
                                     .formatted(tab, channelUrl, describeAvailableTabs(channelInfo.getTabs()))
                     ));
 
-            // Extract the tab's initial page
             ChannelTabExtractor extractor = service.getChannelTabExtractor(tabHandler);
             extractor.fetchPage();
             ChannelTabInfo tabInfo = ChannelTabInfo.getInfo(extractor);
@@ -83,7 +64,7 @@ public class ChannelTabService {
             return ChannelTabDTO.from(tabInfo, tab, channelId);
 
         } catch (ExtractionException e) {
-            throw e; // re-throw as-is so controller can handle it cleanly
+            throw e;
         } catch (Exception e) {
             logger.error("Failed to fetch channel tab '{}' for URL: {}", tab, channelUrl, e);
             throw new ExtractionException(e.getMessage(), e.getCause());
@@ -91,48 +72,67 @@ public class ChannelTabService {
     }
 
     /**
-     * Fetches a subsequent page of channel tab items using a pagination cursor
-     * returned by a previous call.
+     * Fetches a subsequent page of channel tab items.
      *
-     * <p>Unlike the initial fetch, this does <em>not</em> perform any network calls to
-     * reconstruct context. It mirrors what the NewPipe Android app does in
-     * {@code ChannelTabFragment}: the {@code tabHandler} is reconstructed from the
-     * service's {@link ListLinkHandlerFactory} using only the channel ID and tab type,
-     * then passed directly to {@link ChannelTabInfo#getMoreItems(StreamingService, ListLinkHandler, Page)}.
-     * No {@code ChannelInfo} or {@code ChannelTabInfo} pre-fetch is needed.</p>
+     * <p><b>Root cause of the previous NPE:</b> {@code YoutubeChannelTabExtractor.getPage()}
+     * reads two things from the {@link Page} object it receives:</p>
+     * <ol>
+     *   <li>{@code page.getBody()} — a JSON POST body containing the continuation token.
+     *       Without it, the InnerTube browse request has no continuation and YouTube
+     *       returns page 1 again.</li>
+     *   <li>{@code page.getIds()} — a {@code List<String>} of
+     *       {@code ["channelName", "channelUrl", "verifiedStatus"]} used to annotate
+     *       returned items with uploader metadata. Without it, the local variable
+     *       {@code channelIds} is null, causing the NPE in {@code collectItemsFrom}.</li>
+     * </ol>
      *
-     * @param channelUrl  full YouTube channel URL (used only to resolve the service)
-     * @param channelId   the raw channel ID (e.g. {@code UCXuqSBlHAE6Xw-yeJA0Tunw}) — must be
-     *                    the stable UC… ID, not a handle like {@code @LinusTechTips}, since the
-     *                    factory uses it to build the tab URL without a network call
-     * @param tab         tab type string (must match the tab from the initial request)
-     * @param nextPageUrl the {@code nextPage.nextPage} cursor from a previous response
-     * @return next page of items as a {@link ChannelTabDTO}
-     * @throws ExtractionException if extraction fails
+     * <p>The previous implementation built {@code new Page(url)} which discards both,
+     * breaking pagination in two independent ways simultaneously. The fix is to
+     * reconstruct the full {@link Page} from the {@link ChannelTabDTO.PageDto} fields
+     * that were serialized by {@link ChannelTabDTO#buildNextPage} on the previous call.</p>
+     *
+     * @param channelId   channel ID — for the response DTO
+     * @param tab         tab type string matching the initial request
+     * @param pageUrl     from {@code nextPage.url} in the previous response
+     * @param pageBody    from {@code nextPage.body} in the previous response (Base64)
+     * @param pageIds     from {@code nextPage.ids} in the previous response
      */
-    public ChannelTabDTO getChannelTabPage(String channelUrl, String channelId, String tab, String nextPageUrl)
+    public ChannelTabDTO getChannelTabPage(String channelId, String tab,
+                                           String pageUrl, String pageBody, List<String> pageIds)
             throws ExtractionException {
         try {
             logger.info("Fetching next page for channel tab '{}', channelId: {}", tab, channelId);
 
-            StreamingService service = NewPipe.getServiceByUrl(channelUrl);
+            // Reconstruct the full Page with url + body + ids — all three are required.
+            byte[] bodyBytes = pageBody != null ? Base64.getDecoder().decode(pageBody) : null;
+            Page pageInstance = new Page(pageUrl, null, pageIds, null, bodyBytes);
 
-            // Reconstruct the tab handler from the factory — no network call required.
-            // This is exactly what NewPipe Android does: it stores the tabHandler in
-            // fragment state and passes it directly to getMoreChannelTabItems().
-            ListLinkHandlerFactory tabLHFactory = service.getChannelTabLHFactory();
-            if (tabLHFactory == null) {
-                throw new ExtractionException("Service does not support channel tab link handler factory");
+            // We need any initialized YoutubeChannelTabExtractor instance to call getPage() on.
+            // VideosTabExtractor.onFetchPage() is a no-op so we can use the channel URL from
+            // the ids list to cheaply get one via ChannelInfo (one network call).
+            // The extractor itself only provides the getPage() routing — the actual data
+            // is entirely driven by the Page object we pass in.
+            String channelUrl = pageIds != null && pageIds.size() >= 2
+                    ? pageIds.get(1)
+                    : null;
+
+            if (channelUrl == null) {
+                throw new ExtractionException(
+                        "Cannot reconstruct extractor: pageIds missing channelUrl (index 1). " +
+                                "Ensure nextPage.ids is passed correctly from the previous response.");
             }
 
-            ListLinkHandler tabHandler = tabLHFactory.fromQuery(
-                    channelId,          // channel ID (e.g. UCXuqSBlHAE6Xw-yeJA0Tunw)
-                    List.of(tab),       // contentFilters — the tab type
-                    ""                  // sortFilter — empty for YouTube
-            );
+            StreamingService service = NewPipe.getServiceByUrl(channelUrl);
+            ChannelInfo channelInfo = ChannelInfo.getInfo(channelUrl);
+            ListLinkHandler tabHandler = findTabHandler(channelInfo.getTabs(), tab)
+                    .orElseThrow(() -> new ExtractionException(
+                            "Tab '%s' not found for channel '%s'".formatted(tab, channelUrl)
+                    ));
 
-            Page pageInstance = new Page(nextPageUrl);
-            InfoItemsPage<InfoItem> page = ChannelTabInfo.getMoreItems(service, tabHandler, pageInstance);
+            ChannelTabExtractor extractor = service.getChannelTabExtractor(tabHandler);
+            extractor.fetchPage(); // no-op for VideosTabExtractor, cheap for others
+
+            InfoItemsPage<InfoItem> page = extractor.getPage(pageInstance);
 
             logger.info("Fetched {} items from tab '{}' page (hasNextPage={})",
                     page.getItems().size(), tab, page.hasNextPage());
@@ -149,10 +149,6 @@ public class ChannelTabService {
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    /**
-     * Finds the first tab handler whose {@code contentFilters} list contains
-     * the requested tab string (case-insensitive).
-     */
     private Optional<ListLinkHandler> findTabHandler(List<ListLinkHandler> tabs, String tab) {
         return tabs.stream()
                 .filter(t -> t.getContentFilters().stream()

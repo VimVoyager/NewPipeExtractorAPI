@@ -5,6 +5,7 @@ import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 
+import java.util.Base64;
 import java.util.List;
 
 /**
@@ -18,9 +19,7 @@ public class ChannelTabDTO {
 
     // ── Nested Records ──────────────────────────────────────────────────────────
 
-    /**
-     * Thumbnail image for a video item.
-     */
+    /** Thumbnail image for a video item. */
     public record ThumbnailDto(String url, int height, int width) {}
 
     /**
@@ -33,18 +32,16 @@ public class ChannelTabDTO {
             String uploaderName,
             String uploaderUrl,
             boolean uploaderVerified,
-            long duration,          // seconds; -1 if unknown (e.g. live streams)
+            long duration,
             long viewCount,
             String textualUploadDate,
             boolean isShortFormContent,
             List<ThumbnailDto> thumbnails
     ) {
-        /** Build from a NewPipe {@link StreamInfoItem}. */
         public static VideoItemDto from(StreamInfoItem item) {
             List<ThumbnailDto> thumbnails = item.getThumbnails().stream()
                     .map(img -> new ThumbnailDto(img.getUrl(), img.getHeight(), img.getWidth()))
                     .toList();
-
             return new VideoItemDto(
                     item.getUrl(),
                     item.getName(),
@@ -61,11 +58,30 @@ public class ChannelTabDTO {
     }
 
     /**
-     * Pagination cursor — pass {@code nextPage} back to the
-     * {@code /channels/{id}/tab/page} endpoint to load more items.
-     * Will be {@code null} when there are no more pages.
+     * Pagination cursor — pass ALL three fields back to {@code GET /channels/tab/page}.
+     *
+     * <p>NewPipe's {@link org.schabi.newpipe.extractor.Page} carries three essential pieces
+     * of state, all of which are required for pagination to work correctly:</p>
+     *
+     * <ul>
+     *   <li><b>url</b> — InnerTube browse endpoint URL.</li>
+     *   <li><b>body</b> — Base64-encoded JSON POST body containing the continuation token.
+     *       Without this, the browse request has no continuation and returns page 1 again.</li>
+     *   <li><b>ids</b> — {@code ["channelName", "channelUrl", "verifiedStatus"]} metadata.
+     *       {@code YoutubeChannelTabExtractor.getPage()} reads these back via
+     *       {@code page.getIds()} to annotate each returned item with uploader info.
+     *       Without this list, {@code channelIds} is null, causing the NPE in
+     *       {@code collectItemsFrom} at line 235.</li>
+     * </ul>
+     *
+     * <p>The previous implementation only sent {@code url}, discarding {@code body} and
+     * {@code ids}, which broke pagination in two independent ways simultaneously.</p>
      */
-    public record PageDto(String nextPage) {}
+    public record PageDto(
+            String url,
+            String body,     // Base64-encoded byte[] — the JSON continuation token POST body
+            List<String> ids // ["channelName", "channelUrl", "verifiedStatus"]
+    ) {}
 
     // ── Main DTO ────────────────────────────────────────────────────────────────
 
@@ -88,14 +104,6 @@ public class ChannelTabDTO {
 
     // ── Static Factories ────────────────────────────────────────────────────────
 
-    /**
-     * Builds a {@code ChannelTabDTO} from the initial page returned by
-     * {@link ChannelTabInfo#getInfo(org.schabi.newpipe.extractor.linkhandler.ListLinkHandler)}.
-     *
-     * @param tabInfo   the resolved tab info
-     * @param tab       the tab type string (e.g. {@code ChannelTabs.VIDEOS})
-     * @param channelId the channel ID
-     */
     public static ChannelTabDTO from(ChannelTabInfo tabInfo, String tab, String channelId) {
         ChannelTabDTO dto = new ChannelTabDTO();
         dto.tab = tab;
@@ -105,14 +113,6 @@ public class ChannelTabDTO {
         return dto;
     }
 
-    /**
-     * Builds a {@code ChannelTabDTO} from a subsequent page returned by
-     * {@link ChannelTabInfo#getMoreItems}.
-     *
-     * @param page      the paged result
-     * @param tab       the tab type string
-     * @param channelId the channel ID
-     */
     public static ChannelTabDTO fromPage(InfoItemsPage<InfoItem> page, String tab, String channelId) {
         ChannelTabDTO dto = new ChannelTabDTO();
         dto.tab = tab;
@@ -133,7 +133,10 @@ public class ChannelTabDTO {
 
     private static PageDto buildNextPage(org.schabi.newpipe.extractor.Page nextPage) {
         if (nextPage == null || nextPage.getUrl() == null) return null;
-        return new PageDto(nextPage.getUrl());
+        String bodyBase64 = nextPage.getBody() != null
+                ? Base64.getEncoder().encodeToString(nextPage.getBody())
+                : null;
+        return new PageDto(nextPage.getUrl(), bodyBase64, nextPage.getIds());
     }
 
     // ── Getters & Setters ───────────────────────────────────────────────────────
