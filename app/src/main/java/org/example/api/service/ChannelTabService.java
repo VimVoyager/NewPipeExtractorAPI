@@ -1,6 +1,6 @@
 package org.example.api.service;
 
-import org.example.api.dto.ChannelTabDTO;
+import org.example.api.dto.channels.ChannelTabDTO;
 import org.example.api.exception.ExtractionException;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
@@ -86,11 +86,6 @@ public class ChannelTabService {
      *       {@code channelIds} is null, causing the NPE in {@code collectItemsFrom}.</li>
      * </ol>
      *
-     * <p>The previous implementation built {@code new Page(url)} which discards both,
-     * breaking pagination in two independent ways simultaneously. The fix is to
-     * reconstruct the full {@link Page} from the {@link ChannelTabDTO.PageDto} fields
-     * that were serialized by {@link ChannelTabDTO#buildNextPage} on the previous call.</p>
-     *
      * @param channelId   channel ID — for the response DTO
      * @param tab         tab type string matching the initial request
      * @param pageUrl     from {@code nextPage.url} in the previous response
@@ -107,11 +102,6 @@ public class ChannelTabService {
             byte[] bodyBytes = pageBody != null ? Base64.getDecoder().decode(pageBody) : null;
             Page pageInstance = new Page(pageUrl, null, pageIds, null, bodyBytes);
 
-            // We need any initialized YoutubeChannelTabExtractor instance to call getPage() on.
-            // VideosTabExtractor.onFetchPage() is a no-op so we can use the channel URL from
-            // the ids list to cheaply get one via ChannelInfo (one network call).
-            // The extractor itself only provides the getPage() routing — the actual data
-            // is entirely driven by the Page object we pass in.
             String channelUrl = pageIds != null && pageIds.size() >= 2
                     ? pageIds.get(1)
                     : null;
@@ -130,7 +120,7 @@ public class ChannelTabService {
                     ));
 
             ChannelTabExtractor extractor = service.getChannelTabExtractor(tabHandler);
-            extractor.fetchPage(); // no-op for VideosTabExtractor, cheap for others
+            extractor.fetchPage();
 
             InfoItemsPage<InfoItem> page = extractor.getPage(pageInstance);
 

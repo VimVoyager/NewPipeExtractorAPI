@@ -19,11 +19,4 @@ public class ChannelService {
             throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
-
-
-//    public String getChannelPage(@NonNull String url, @NonNull String pageUrl) throws IOException, ExtractionException {
-//        StreamingService service = NewPipe.getServiceByUrl(url);
-//        InfoItemsPage<StreamInfoItem> page = ChannelInfo.getMoreItems(service, url, pageUrl);
-//        return objectManager.writeValueAsString(page);
-//    }
 }

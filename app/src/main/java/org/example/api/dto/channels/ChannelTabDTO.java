@@ -1,4 +1,4 @@
-package org.example.api.dto;
+package org.example.api.dto.channels;
 
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;

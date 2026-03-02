@@ -1,7 +1,7 @@
 package org.example.api.controller;
 
-import org.example.api.dto.ChannelDTO;
-import org.example.api.dto.ChannelTabDTO;
+import org.example.api.dto.channels.ChannelDTO;
+import org.example.api.dto.channels.ChannelTabDTO;
 import org.example.api.exception.ExtractionException;
 import org.example.api.service.ChannelService;
 import org.example.api.service.ChannelTabService;
