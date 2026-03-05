@@ -87,7 +87,7 @@ public class DownloaderImpl extends Downloader {
             throw new IOException(e.getMessage(), e.getCause());
         }
     }
-  @Override
+    @Override
     public Response execute(@NonNull Request request) throws IOException, ReCaptchaException {
         try {
             final String httpMethod = request.httpMethod();
@@ -97,9 +97,9 @@ public class DownloaderImpl extends Downloader {
 
             RequestBody requestBody = null;
             if (dataToSend != null) {
-                requestBody = RequestBody.create(dataToSend, null);
+                requestBody = RequestBody.create(dataToSend, okhttp3.MediaType.parse("application/json"));
             } else if (httpMethod.equals("POST") || httpMethod.equals("PUT") || httpMethod.equals("PATCH")) {
-                requestBody = RequestBody.create(new byte[0], null);
+                requestBody = RequestBody.create(new byte[0], okhttp3.MediaType.parse("application/json"));
             }
 
             final okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder()

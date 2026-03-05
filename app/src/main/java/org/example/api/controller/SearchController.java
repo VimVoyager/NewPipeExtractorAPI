@@ -32,15 +32,10 @@ public class SearchController {
 
     /**
      * Performs a search and returns the initial results.
-     *
-     * @param searchString The search query
-     * @param sortFilter Optional sort filter
-     * @param contentFilters Optional comma-separated content filters
-     * @return SearchResultDTO with search results
      */
     @GetMapping
     public ResponseEntity<SearchResultDTO> search(
-            @RequestParam(name = "searchString", required = true) String searchString,
+            @RequestParam(name = "searchString") String searchString,
             @RequestParam(name = "sortFilter", required = false) String sortFilter,
             @RequestParam(name = "contentFilters", required = false) String contentFilters
     ) {
@@ -63,20 +58,26 @@ public class SearchController {
     /**
      * Retrieves a specific page of search results.
      *
-     * @param searchString The search query
-     * @param pageUrl The page URL for pagination
-     * @param sortFilter Optional sort filter
-     * @param contentFilters Optional comma-separated content filters
-     * @return SearchPageDTO with the requested page of results
+     * <p>Both {@code pageUrl} and {@code pageBody} must be passed verbatim from the
+     * {@code nextPage} object in the previous response. The body is the Base64-encoded
+     * InnerTube continuation token. {@code pageBody} is optional — some continuation
+     * pages are URL-only and will have a null body in the previous response.</p>
+     *
+     * @param searchString   the original search query
+     * @param pageUrl        from {@code nextPage.url} in the previous response
+     * @param pageId         from {@code nextPage.Id} in the previous response
+     * @param sortFilter     optional sort filter (must match the initial request)
+     * @param contentFilters optional comma-separated content filters (must match the initial request)
      */
     @GetMapping("/page")
     public ResponseEntity<SearchPageDTO> searchPage(
-            @RequestParam(name = "searchString",required = true) String searchString,
-            @RequestParam(name = "pageUrl", required = true) String pageUrl,
+            @RequestParam(name = "searchString") String searchString,
+            @RequestParam(name = "pageUrl") String pageUrl,
+            @RequestParam(name = "pageId", required = false) String pageId,
             @RequestParam(name = "sortFilter", required = false) String sortFilter,
             @RequestParam(name = "contentFilters", required = false) String contentFilters
     ) {
-        logger.info("Search page request for: {} with pageUrl: {}", searchString, pageUrl);
+        logger.info("Search page request for: {}", searchString);
 
         ValidationUtils.requireNonEmpty(searchString, "searchString");
         ValidationUtils.requireNonEmpty(pageUrl, "pageUrl");
@@ -87,18 +88,13 @@ public class SearchController {
                 searchString,
                 contentFilterList,
                 sortFilter,
-                pageUrl
+                pageUrl,
+                pageId
         );
 
         return ResponseEntity.ok(page);
     }
 
-    /**
-     * Parses comma-separated content filters into a list.
-     *
-     * @param contentFilters Comma-separated filter string
-     * @return List of filter strings, or empty list if null/empty
-     */
     private List<String> parseContentFilters(String contentFilters) {
         if (contentFilters == null || contentFilters.trim().isEmpty()) {
             return Collections.emptyList();

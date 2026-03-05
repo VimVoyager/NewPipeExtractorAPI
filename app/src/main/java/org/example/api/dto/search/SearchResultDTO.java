@@ -1,8 +1,10 @@
 package org.example.api.dto.search;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,14 +35,38 @@ public class SearchResultDTO {
     @JsonProperty("items")
     private List<SearchItemDTO> items;
 
-    @JsonProperty("nextPageUrl")
-    private String nextPageUrl;
+    @JsonProperty("nextPage")
+    private PageDto nextPage;
 
     @JsonProperty("hasNextPage")
     private boolean hasNextPage;
 
-    // Constructors
+    // ── Nested Record ────────────────────────────────────────────────────────────
+
+    /**
+     * Pagination cursor — pass both fields back to {@code GET /api/v1/search/page}.
+     *
+     * <p>{@code YoutubeSearchExtractor.getPage()} reads two things from the
+     * {@link org.schabi.newpipe.extractor.Page} it receives:</p>
+     * <ul>
+     *   <li><b>url</b> — the InnerTube search endpoint URL.</li>
+     *   <li><b>body</b> — Base64-encoded JSON POST body containing the continuation token.
+     *       Without this, the search request has no continuation and YouTube returns
+     *       page 1 again.</li>
+     * </ul>
+     *
+     */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record PageDto(
+            String url,
+            String id   // the continuation token string from page.getId()
+    ) {}
+
+    // ── Constructors ─────────────────────────────────────────────────────────────
+
     public SearchResultDTO() {}
+
+    // ── Static Factory ───────────────────────────────────────────────────────────
 
     /**
      * Creates a SearchResultDTO from a SearchInfo object.
@@ -58,92 +84,49 @@ public class SearchResultDTO {
         dto.setSearchSuggestion(searchInfo.getSearchSuggestion());
         dto.setCorrectedSearch(searchInfo.isCorrectedSearch());
 
-        // Map related items to DTOs
         dto.setItems(searchInfo.getRelatedItems().stream()
                 .map(SearchItemDTO::from)
                 .collect(Collectors.toList()));
 
-        // Handle pagination
-        if (searchInfo.getNextPage() != null) {
-            dto.setNextPageUrl(searchInfo.getNextPage().getUrl());
-            dto.setHasNextPage(true);
-        } else {
-            dto.setHasNextPage(false);
-        }
+        dto.setNextPage(buildNextPage(searchInfo.getNextPage()));
+        dto.setHasNextPage(dto.nextPage != null);
 
         return dto;
     }
 
-    // Getters and Setters
-    public String getUrl() {
-        return url;
+    // ── Helpers ──────────────────────────────────────────────────────────────────
+
+    private static PageDto buildNextPage(org.schabi.newpipe.extractor.Page page) {
+        if (page == null || page.getUrl() == null) return null;
+        return new PageDto(page.getUrl(), page.getId());
     }
 
-    public void setUrl(String url) {
-        this.url = url;
-    }
+    // ── Getters & Setters ────────────────────────────────────────────────────────
 
-    public String getOriginalUrl() {
-        return originalUrl;
-    }
+    public String getUrl() { return url; }
+    public void setUrl(String url) { this.url = url; }
 
-    public void setOriginalUrl(String originalUrl) {
-        this.originalUrl = originalUrl;
-    }
+    public String getOriginalUrl() { return originalUrl; }
+    public void setOriginalUrl(String originalUrl) { this.originalUrl = originalUrl; }
 
-    public String getName() {
-        return name;
-    }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+    public String getSearchString() { return searchString; }
+    public void setSearchString(String searchString) { this.searchString = searchString; }
 
-    public String getSearchString() {
-        return searchString;
-    }
+    public String getSearchSuggestion() { return searchSuggestion; }
+    public void setSearchSuggestion(String searchSuggestion) { this.searchSuggestion = searchSuggestion; }
 
-    public void setSearchString(String searchString) {
-        this.searchString = searchString;
-    }
+    public boolean isCorrectedSearch() { return isCorrectedSearch; }
+    public void setCorrectedSearch(boolean correctedSearch) { isCorrectedSearch = correctedSearch; }
 
-    public String getSearchSuggestion() {
-        return searchSuggestion;
-    }
+    public List<SearchItemDTO> getItems() { return items; }
+    public void setItems(List<SearchItemDTO> items) { this.items = items; }
 
-    public void setSearchSuggestion(String searchSuggestion) {
-        this.searchSuggestion = searchSuggestion;
-    }
+    public PageDto getNextPage() { return nextPage; }
+    public void setNextPage(PageDto nextPage) { this.nextPage = nextPage; }
 
-    public boolean isCorrectedSearch() {
-        return isCorrectedSearch;
-    }
-
-    public void setCorrectedSearch(boolean correctedSearch) {
-        isCorrectedSearch = correctedSearch;
-    }
-
-    public List<SearchItemDTO> getItems() {
-        return items;
-    }
-
-    public void setItems(List<SearchItemDTO> items) {
-        this.items = items;
-    }
-
-    public String getNextPageUrl() {
-        return nextPageUrl;
-    }
-
-    public void setNextPageUrl(String nextPageUrl) {
-        this.nextPageUrl = nextPageUrl;
-    }
-
-    public boolean isHasNextPage() {
-        return hasNextPage;
-    }
-
-    public void setHasNextPage(boolean hasNextPage) {
-        this.hasNextPage = hasNextPage;
-    }
+    public boolean isHasNextPage() { return hasNextPage; }
+    public void setHasNextPage(boolean hasNextPage) { this.hasNextPage = hasNextPage; }
 }

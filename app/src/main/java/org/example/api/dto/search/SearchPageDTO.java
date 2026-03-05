@@ -3,6 +3,7 @@ package org.example.api.dto.search;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.schabi.newpipe.extractor.ListExtractor;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -15,8 +16,8 @@ public class SearchPageDTO {
     @JsonProperty("items")
     private List<SearchItemDTO> items;
 
-    @JsonProperty("nextPageUrl")
-    private String nextPageUrl;
+    @JsonProperty("nextPage")
+    private SearchResultDTO.PageDto nextPage;
 
     @JsonProperty("hasNextPage")
     private boolean hasNextPage;
@@ -36,54 +37,35 @@ public class SearchPageDTO {
     public static SearchPageDTO from(ListExtractor.InfoItemsPage<?> page) {
         SearchPageDTO dto = new SearchPageDTO();
 
-        // Map items
         dto.setItems(page.getItems().stream()
                 .map(SearchItemDTO::from)
                 .collect(Collectors.toList()));
 
         dto.setItemCount(page.getItems().size());
-
-        // Handle pagination
-        if (page.hasNextPage() && page.getNextPage() != null) {
-            dto.setNextPageUrl(page.getNextPage().getUrl());
-            dto.setHasNextPage(true);
-        } else {
-            dto.setHasNextPage(false);
-        }
+        dto.setNextPage(buildNextPage(page.getNextPage()));
+        dto.setHasNextPage(dto.nextPage != null);
 
         return dto;
     }
 
+    // Helpers
+
+    private static SearchResultDTO.PageDto buildNextPage(org.schabi.newpipe.extractor.Page page) {
+        if (page == null || page.getUrl() == null) return null;
+        return new SearchResultDTO.PageDto(page.getUrl(), page.getId());
+    }
+
     // Getters and Setters
-    public List<SearchItemDTO> getItems() {
-        return items;
-    }
 
-    public void setItems(List<SearchItemDTO> items) {
-        this.items = items;
-    }
+    public List<SearchItemDTO> getItems() { return items; }
+    public void setItems(List<SearchItemDTO> items) { this.items = items; }
 
-    public String getNextPageUrl() {
-        return nextPageUrl;
-    }
+    public SearchResultDTO.PageDto getNextPage() { return nextPage; }
+    public void setNextPage(SearchResultDTO.PageDto nextPage) { this.nextPage = nextPage; }
 
-    public void setNextPageUrl(String nextPageUrl) {
-        this.nextPageUrl = nextPageUrl;
-    }
+    public boolean isHasNextPage() { return hasNextPage; }
+    public void setHasNextPage(boolean hasNextPage) { this.hasNextPage = hasNextPage; }
 
-    public boolean isHasNextPage() {
-        return hasNextPage;
-    }
-
-    public void setHasNextPage(boolean hasNextPage) {
-        this.hasNextPage = hasNextPage;
-    }
-
-    public int getItemCount() {
-        return itemCount;
-    }
-
-    public void setItemCount(int itemCount) {
-        this.itemCount = itemCount;
-    }
+    public int getItemCount() { return itemCount; }
+    public void setItemCount(int itemCount) { this.itemCount = itemCount; }
 }
