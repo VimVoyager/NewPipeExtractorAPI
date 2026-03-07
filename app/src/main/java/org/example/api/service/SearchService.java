@@ -8,7 +8,6 @@ import org.schabi.newpipe.extractor.ListExtractor;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
-import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandler;
 import org.schabi.newpipe.extractor.search.SearchExtractor;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 import org.slf4j.Logger;
@@ -16,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -61,7 +59,7 @@ public class SearchService {
             return dto;
         } catch (Exception e) {
             logger.error("Failed to retrieve search results for: {}", searchString, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -69,10 +67,10 @@ public class SearchService {
      * Retrieves the next page of search results.
      *
      * <p>Mirrors the pattern used in {@link ChannelTabService#getChannelTabPage}: a
-     * {@link SearchExtractor} is obtained for the original query, initialised with
+     * {@link SearchExtractor} is obtained for the original query, initialized with
      * {@code fetchPage()} to establish the InnerTube session state, and then
      * {@code getPage(pageInstance)} is called with the reconstructed {@link Page}.
-     * Using {@code SearchInfo.getMoreItems()} without this initialisation step skips
+     * Using {@code SearchInfo.getMoreItems()} without this initialization step skips
      * the extractor setup and results in empty pages.</p>
      *
      * @param searchString   the original query string
@@ -114,7 +112,7 @@ public class SearchService {
             return dto;
         } catch (Exception e) {
             logger.error("Failed to retrieve search page for: {}", searchString, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
