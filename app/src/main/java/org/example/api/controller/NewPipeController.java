@@ -1,11 +1,6 @@
 package org.example.api.controller;
 
-import org.example.api.dto.CommentsDTO;
 import org.example.api.service.RestService;
-import org.example.api.utils.ValidationUtils;
-import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
-import org.schabi.newpipe.extractor.comments.CommentsInfo;
-import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -269,37 +264,5 @@ public class NewPipeController {
                             "details", e.getMessage()
                     ));
         }
-    }
-
-    @GetMapping("/comments")
-    public ResponseEntity<?> getComments(@RequestParam(name = "id") String id) throws Exception {
-        logger.info("Retrieving comments info for ID: {}", id);
-
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        CommentsInfo comments = restService.getCommentsInfo(url);
-        CommentsDTO.CommentsResponseDto dto = restService.mapCommentsToDto(comments);
-
-        return ResponseEntity.ok(dto);
-    }
-
-    @GetMapping("/comments/page")
-    public ResponseEntity<?> getCommentsPage(
-            @RequestParam(name = "id") String id,
-            @RequestParam(name = "pageUrl") String pageUrl
-    ) throws Exception {
-        logger.info("Retrieving comments page for id: {}, pageUrl: {}", id, pageUrl);
-
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-        ValidationUtils.requireValidUrl(pageUrl);
-
-        InfoItemsPage<CommentsInfoItem> commentsPageJson = restService.getCommentsPage(
-                url,
-                pageUrl
-        );
-
-        return ResponseEntity.ok(commentsPageJson);
     }
 }
