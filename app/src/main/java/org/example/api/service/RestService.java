@@ -2,16 +2,12 @@ package org.example.api.service;
 
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import org.example.api.dto.CommentsDTO;
-import org.example.api.exception.ExtractionException;
 import org.example.api.model.Error;
 import org.example.api.utils.SerializationUtils;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
-import org.schabi.newpipe.extractor.comments.CommentsInfo;
-import org.schabi.newpipe.extractor.comments.CommentsInfoItem;
 import org.schabi.newpipe.extractor.kiosk.KioskInfo;
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo;
 import org.schabi.newpipe.extractor.search.SearchInfo;
@@ -130,30 +126,6 @@ public class RestService {
         }
     }
 
-
-    public CommentsInfo getCommentsInfo(String url) throws ExtractionException {
-        try {
-            logger.info("Extracting comments for URL: {}", url);
-            return CommentsInfo.getInfo(url);
-        } catch (Exception e) {
-            logger.error("Failed to extract comments for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
-        }
-    }
-
-    public InfoItemsPage<CommentsInfoItem> getCommentsPage(String url, String pageUrl) throws ExtractionException {
-        try {
-            //TODO optimize this. init page is fetched every time
-            logger.info("Extracting comments page for URL: {}", url);
-            CommentsInfo info = CommentsInfo.getInfo(url);
-            Page pageInstance = new Page(pageUrl);
-            return CommentsInfo.getMoreItems(info, pageInstance);
-        } catch (Exception e) {
-            logger.error("Failed to extract comments page for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
-        }
-    }
-
     public String getError(Exception e) {
         String message = e.getMessage() != null ? e.getMessage() : "An error occurred";
         Error errorResponse = new Error(message);
@@ -164,65 +136,5 @@ public class RestService {
         }
     }
 
-    public CommentsDTO.CommentsResponseDto mapCommentsToDto(CommentsInfo info) {
-        List<CommentsDTO.CommentItemDto> items = info.getRelatedItems().stream()
-                .map(item -> {
-                    List<CommentsDTO.AvatarDto> thumbnails = item.getThumbnails().stream()
-                            .map(t -> new CommentsDTO.AvatarDto(t.getUrl(), t.getHeight(), t.getWidth()))
-                            .toList();
 
-                    List<CommentsDTO.AvatarDto> avatars = item.getUploaderAvatars().stream()
-                            .map(a -> new CommentsDTO.AvatarDto(a.getUrl(), a.getHeight(), a.getWidth()))
-                            .toList();
-
-                    CommentsDTO.RepliesDto replies = null;
-                    if (item.getReplies() != null) {
-                        replies = new CommentsDTO.RepliesDto(
-                                item.getReplies().getUrl(),
-                                item.getReplies().getId()
-                        );
-                    }
-
-                    CommentsDTO.UploadDateDto uploadDate = null;
-                    if (item.getUploadDate() != null) {
-                        uploadDate = new CommentsDTO.UploadDateDto(item.getUploadDate().isApproximation());
-                    }
-
-                    return new CommentsDTO.CommentItemDto(
-                            "COMMENT",
-                            item.getServiceId(),
-                            item.getUrl(),
-                            item.getName(),
-                            thumbnails,
-                            item.getCommentId(),
-                            item.getCommentText().getContent(),
-                            item.getCommentText().getType(),
-                            item.getUploaderName(),
-                            avatars,
-                            item.getUploaderUrl(),
-                            item.isUploaderVerified(),
-                            item.getTextualUploadDate(),
-                            uploadDate,
-                            item.getLikeCount(),
-                            item.getTextualLikeCount(),
-                            item.isHeartedByUploader(),
-                            item.isPinned(),
-                            item.getStreamPosition(),
-                            item.getReplyCount(),
-                            replies,
-                            item.isChannelOwner()
-                    );
-                })
-                .toList();
-
-        return new CommentsDTO.CommentsResponseDto(
-                info.getServiceId(),
-                info.getId(),
-                info.getUrl(),
-                info.getOriginalUrl(),
-                info.getName(),
-                List.of(),
-                items
-        );
-    }
 }
