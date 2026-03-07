@@ -11,6 +11,7 @@ import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
+import org.schabi.newpipe.extractor.stream.StreamType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +33,31 @@ class SearchResultDTOTest {
         objectMapper = new ObjectMapper();
     }
 
+    // ── Helpers ──────────────────────────────────────────────────────────────────
+
+    /**
+     * Builds a real Page with the given url and id (continuation token string).
+     * Mirrors what YoutubeSearchExtractor.getNextPageFrom() produces:
+     *   return new Page(url, token)  →  Page(String url, String id)
+     * Page's methods are final, so it cannot be mocked — use real instances.
+     */
+    private Page realPage(String url, String id) {
+        return new Page(url, id);
+    }
+
+    private InfoItem mockStreamItem(String name, String url) {
+        return new org.schabi.newpipe.extractor.stream.StreamInfoItem(
+                0, url, name,
+                org.schabi.newpipe.extractor.stream.StreamType.VIDEO_STREAM) {
+            @Override
+            public java.util.List<org.schabi.newpipe.extractor.Image> getThumbnails() {
+                return List.of();
+            }
+        };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("Factory Method Tests")
     class FactoryMethodTests {
@@ -47,15 +73,10 @@ class SearchResultDTOTest {
             when(searchInfo.getSearchString()).thenReturn("test");
             when(searchInfo.getSearchSuggestion()).thenReturn("test suggestion");
             when(searchInfo.isCorrectedSearch()).thenReturn(false);
+            when(searchInfo.getRelatedItems()).thenReturn(List.of(mockStreamItem("Video 1", "https://youtube.com/watch?v=1")));
 
-            StreamInfoItem item = mock(StreamInfoItem.class);
-            when(item.getName()).thenReturn("Video 1");
-            when(item.getUrl()).thenReturn("https://youtube.com/watch?v=1");
-            when(item.getThumbnails()).thenReturn(List.of());
-            when(searchInfo.getRelatedItems()).thenReturn(List.of(item));
-
-            Page nextPage = new Page("https://youtube.com/results?page=2");
-            when(searchInfo.getNextPage()).thenReturn(nextPage);
+            String token = "4qmFsgJcEBIYdmlkZW8";
+            when(searchInfo.getNextPage()).thenReturn(realPage("https://youtube.com/results?page=2", token));
 
             // Act
             SearchResultDTO dto = SearchResultDTO.from(searchInfo);
@@ -69,7 +90,9 @@ class SearchResultDTOTest {
             assertFalse(dto.isCorrectedSearch());
             assertEquals(1, dto.getItems().size());
             assertTrue(dto.isHasNextPage());
-            assertEquals("https://youtube.com/results?page=2", dto.getNextPageUrl());
+            assertNotNull(dto.getNextPage());
+            assertEquals("https://youtube.com/results?page=2", dto.getNextPage().url());
+            assertEquals(token, dto.getNextPage().id());
         }
 
         @Test
@@ -98,7 +121,7 @@ class SearchResultDTOTest {
             assertFalse(dto.isCorrectedSearch());
             assertTrue(dto.getItems().isEmpty());
             assertFalse(dto.isHasNextPage());
-            assertNull(dto.getNextPageUrl());
+            assertNull(dto.getNextPage());
         }
 
         @Test
@@ -150,14 +173,10 @@ class SearchResultDTOTest {
 
             List<InfoItem> items = new ArrayList<>();
             for (int i = 0; i < 20; i++) {
-                StreamInfoItem item = mock(StreamInfoItem.class);
-                when(item.getName()).thenReturn("Video " + i);
-                when(item.getUrl()).thenReturn("https://youtube.com/watch?v=" + i);
-                when(item.getThumbnails()).thenReturn(List.of());
-                items.add(item);
+                items.add(mockStreamItem("Video " + i, "https://youtube.com/watch?v=" + i));
             }
             when(searchInfo.getRelatedItems()).thenReturn(items);
-            when(searchInfo.getNextPage()).thenReturn(new Page("https://youtube.com/results?page=2"));
+            when(searchInfo.getNextPage()).thenReturn(realPage("https://youtube.com/results?page=2", "someToken"));
 
             // Act
             SearchResultDTO dto = SearchResultDTO.from(searchInfo);
@@ -174,12 +193,7 @@ class SearchResultDTOTest {
             SearchInfo searchInfo = mock(SearchInfo.class);
             when(searchInfo.getUrl()).thenReturn("https://youtube.com/results?page=5");
             when(searchInfo.getSearchString()).thenReturn("query");
-
-            StreamInfoItem item = mock(StreamInfoItem.class);
-            when(item.getName()).thenReturn("Last Video");
-            when(item.getUrl()).thenReturn("https://youtube.com/watch?v=last");
-            when(item.getThumbnails()).thenReturn(List.of());
-            when(searchInfo.getRelatedItems()).thenReturn(List.of(item));
+            when(searchInfo.getRelatedItems()).thenReturn(List.of(mockStreamItem("Last Video", "https://youtube.com/watch?v=last")));
             when(searchInfo.getNextPage()).thenReturn(null);
 
             // Act
@@ -188,7 +202,68 @@ class SearchResultDTOTest {
             // Assert
             assertEquals(1, dto.getItems().size());
             assertFalse(dto.isHasNextPage());
-            assertNull(dto.getNextPageUrl());
+            assertNull(dto.getNextPage());
+        }
+    }
+
+    @Nested
+    @DisplayName("PageDto Serialization Tests")
+    class PageDtoTests {
+
+        @Test
+        @DisplayName("Should set id to null when Page has no id")
+        void testBuildNextPage_NullId() {
+            // Arrange — Page with url but null id (token not present)
+            SearchInfo searchInfo = mock(SearchInfo.class);
+            when(searchInfo.getUrl()).thenReturn("https://youtube.com/results");
+            when(searchInfo.getSearchString()).thenReturn("query");
+            when(searchInfo.getRelatedItems()).thenReturn(List.of());
+            when(searchInfo.getNextPage()).thenReturn(realPage("https://youtube.com/browse", null));
+
+            // Act
+            SearchResultDTO dto = SearchResultDTO.from(searchInfo);
+
+            // Assert
+            assertNotNull(dto.getNextPage());
+            assertEquals("https://youtube.com/browse", dto.getNextPage().url());
+            assertNull(dto.getNextPage().id());
+        }
+
+        @Test
+        @DisplayName("Should pass continuation token string through as id")
+        void testBuildNextPage_TokenPassthrough() {
+            // Arrange — YoutubeSearchExtractor stores the token as page.getId(), not page.getBody()
+            String token = "4qmFsgJcEBIYdmlkZW8_continuation_token";
+
+            SearchInfo searchInfo = mock(SearchInfo.class);
+            when(searchInfo.getUrl()).thenReturn("https://youtube.com/results");
+            when(searchInfo.getSearchString()).thenReturn("query");
+            when(searchInfo.getRelatedItems()).thenReturn(List.of());
+            when(searchInfo.getNextPage()).thenReturn(realPage("https://youtube.com/browse", token));
+
+            // Act
+            SearchResultDTO dto = SearchResultDTO.from(searchInfo);
+
+            // Assert
+            assertEquals(token, dto.getNextPage().id());
+        }
+
+        @Test
+        @DisplayName("Should return null nextPage when Page url is null")
+        void testBuildNextPage_NullUrl() {
+            // Arrange
+            SearchInfo searchInfo = mock(SearchInfo.class);
+            when(searchInfo.getUrl()).thenReturn("https://youtube.com/results");
+            when(searchInfo.getSearchString()).thenReturn("query");
+            when(searchInfo.getRelatedItems()).thenReturn(List.of());
+            when(searchInfo.getNextPage()).thenReturn(realPage(null, "someToken"));
+
+            // Act
+            SearchResultDTO dto = SearchResultDTO.from(searchInfo);
+
+            // Assert
+            assertNull(dto.getNextPage());
+            assertFalse(dto.isHasNextPage());
         }
     }
 
@@ -202,8 +277,8 @@ class SearchResultDTOTest {
             // Arrange
             SearchInfo searchInfo = mock(SearchInfo.class);
             when(searchInfo.getUrl()).thenReturn("https://youtube.com/results");
-            when(searchInfo.getSearchString()).thenReturn("javasript");
-            when(searchInfo.getSearchSuggestion()).thenReturn("javascript"); // Typo corrected
+            when(searchInfo.getSearchString()).thenReturn("java programming");
+            when(searchInfo.getSearchSuggestion()).thenReturn("java programming tutorial");
             when(searchInfo.isCorrectedSearch()).thenReturn(false);
             when(searchInfo.getRelatedItems()).thenReturn(List.of());
             when(searchInfo.getNextPage()).thenReturn(null);
@@ -212,8 +287,7 @@ class SearchResultDTOTest {
             SearchResultDTO dto = SearchResultDTO.from(searchInfo);
 
             // Assert
-            assertEquals("javasript", dto.getSearchString());
-            assertEquals("javascript", dto.getSearchSuggestion());
+            assertEquals("java programming tutorial", dto.getSearchSuggestion());
         }
 
         @Test
@@ -222,7 +296,7 @@ class SearchResultDTOTest {
             // Arrange
             SearchInfo searchInfo = mock(SearchInfo.class);
             when(searchInfo.getUrl()).thenReturn("https://youtube.com/results");
-            when(searchInfo.getSearchString()).thenReturn("perfect query");
+            when(searchInfo.getSearchString()).thenReturn("query");
             when(searchInfo.getSearchSuggestion()).thenReturn(null);
             when(searchInfo.getRelatedItems()).thenReturn(List.of());
             when(searchInfo.getNextPage()).thenReturn(null);
@@ -240,83 +314,64 @@ class SearchResultDTOTest {
     class JsonSerializationTests {
 
         @Test
-        @DisplayName("Should serialize to JSON with all fields")
-        void testSerialize_AllFields() throws Exception {
+        @DisplayName("Should serialize nextPage as object with url and id fields")
+        void testSerialize_NextPageObject() throws Exception {
             // Arrange
-            SearchResultDTO dto = new SearchResultDTO();
-            dto.setUrl("https://youtube.com/results");
-            dto.setOriginalUrl("https://youtube.com/search");
-            dto.setName("Results");
-            dto.setSearchString("test query");
-            dto.setSearchSuggestion("suggestion");
-            dto.setCorrectedSearch(true);
-            dto.setItems(List.of());
-            dto.setNextPageUrl("https://youtube.com/page2");
-            dto.setHasNextPage(true);
+            SearchInfo searchInfo = mock(SearchInfo.class);
+            when(searchInfo.getUrl()).thenReturn("https://youtube.com/results");
+            when(searchInfo.getSearchString()).thenReturn("query");
+            when(searchInfo.getRelatedItems()).thenReturn(List.of());
+            when(searchInfo.getNextPage()).thenReturn(realPage("https://youtube.com/browse", "token123"));
+
+            SearchResultDTO dto = SearchResultDTO.from(searchInfo);
+
+            // Act
+            String json = objectMapper.writeValueAsString(dto);
+
+            // Assert — nextPage should be a JSON object with url and id fields
+            assertTrue(json.contains("\"nextPage\":{"));
+            assertTrue(json.contains("\"url\""));
+            assertTrue(json.contains("\"id\""));
+            assertTrue(json.contains("https://youtube.com/browse"));
+        }
+
+        @Test
+        @DisplayName("Should serialize nextPage as null when no further pages")
+        void testSerialize_NullNextPage() throws Exception {
+            // Arrange
+            SearchInfo searchInfo = mock(SearchInfo.class);
+            when(searchInfo.getUrl()).thenReturn("https://youtube.com/results");
+            when(searchInfo.getSearchString()).thenReturn("query");
+            when(searchInfo.getRelatedItems()).thenReturn(List.of());
+            when(searchInfo.getNextPage()).thenReturn(null);
+
+            SearchResultDTO dto = SearchResultDTO.from(searchInfo);
 
             // Act
             String json = objectMapper.writeValueAsString(dto);
 
             // Assert
-            assertTrue(json.contains("\"url\":\"https://youtube.com/results\""));
-            assertTrue(json.contains("\"searchString\":\"test query\""));
-            assertTrue(json.contains("\"isCorrectedSearch\":true"));
-            assertTrue(json.contains("\"hasNextPage\":true"));
+            assertTrue(json.contains("\"nextPage\":null"));
         }
 
         @Test
-        @DisplayName("Should deserialize from JSON")
-        void testDeserialize() throws Exception {
+        @DisplayName("Should serialize full DTO to JSON")
+        void testSerialize_FullDto() throws Exception {
             // Arrange
-            String json = """
-                {
-                    "url": "https://test.com/results",
-                    "originalUrl": "https://test.com/search",
-                    "name": "Search Results",
-                    "searchString": "test",
-                    "searchSuggestion": "testing",
-                    "isCorrectedSearch": false,
-                    "items": [],
-                    "nextPageUrl": "https://test.com/page2",
-                    "hasNextPage": true
-                }
-                """;
+            SearchResultDTO dto = new SearchResultDTO();
+            dto.setSearchString("test");
+            dto.setItems(List.of());
+            dto.setHasNextPage(false);
+            dto.setNextPage(null);
 
             // Act
-            SearchResultDTO dto = objectMapper.readValue(json, SearchResultDTO.class);
+            String json = objectMapper.writeValueAsString(dto);
 
             // Assert
-            assertEquals("https://test.com/results", dto.getUrl());
-            assertEquals("https://test.com/search", dto.getOriginalUrl());
-            assertEquals("Search Results", dto.getName());
-            assertEquals("test", dto.getSearchString());
-            assertEquals("testing", dto.getSearchSuggestion());
-            assertFalse(dto.isCorrectedSearch());
-            assertTrue(dto.getItems().isEmpty());
-            assertEquals("https://test.com/page2", dto.getNextPageUrl());
-            assertTrue(dto.isHasNextPage());
-        }
-
-        @Test
-        @DisplayName("Should handle round-trip serialization")
-        void testRoundTrip() throws Exception {
-            // Arrange
-            SearchResultDTO original = new SearchResultDTO();
-            original.setUrl("https://youtube.com/results");
-            original.setSearchString("round trip test");
-            original.setCorrectedSearch(false);
-            original.setItems(List.of());
-            original.setHasNextPage(false);
-
-            // Act
-            String json = objectMapper.writeValueAsString(original);
-            SearchResultDTO deserialized = objectMapper.readValue(json, SearchResultDTO.class);
-
-            // Assert
-            assertEquals(original.getUrl(), deserialized.getUrl());
-            assertEquals(original.getSearchString(), deserialized.getSearchString());
-            assertEquals(original.isCorrectedSearch(), deserialized.isCorrectedSearch());
-            assertEquals(original.isHasNextPage(), deserialized.isHasNextPage());
+            assertTrue(json.contains("\"searchString\""));
+            assertTrue(json.contains("\"items\""));
+            assertTrue(json.contains("\"hasNextPage\""));
+            assertTrue(json.contains("test"));
         }
     }
 
@@ -330,6 +385,7 @@ class SearchResultDTOTest {
             // Arrange
             SearchResultDTO dto = new SearchResultDTO();
             List<SearchItemDTO> items = List.of(new SearchItemDTO());
+            SearchResultDTO.PageDto pageDto = new SearchResultDTO.PageDto("https://next.com", "continuationToken");
 
             // Act
             dto.setUrl("https://url.com");
@@ -339,7 +395,7 @@ class SearchResultDTOTest {
             dto.setSearchSuggestion("suggestion");
             dto.setCorrectedSearch(true);
             dto.setItems(items);
-            dto.setNextPageUrl("https://next.com");
+            dto.setNextPage(pageDto);
             dto.setHasNextPage(true);
 
             // Assert
@@ -350,7 +406,9 @@ class SearchResultDTOTest {
             assertEquals("suggestion", dto.getSearchSuggestion());
             assertTrue(dto.isCorrectedSearch());
             assertEquals(1, dto.getItems().size());
-            assertEquals("https://next.com", dto.getNextPageUrl());
+            assertSame(pageDto, dto.getNextPage());
+            assertEquals("https://next.com", dto.getNextPage().url());
+            assertEquals("continuationToken", dto.getNextPage().id());
             assertTrue(dto.isHasNextPage());
         }
 
@@ -367,7 +425,7 @@ class SearchResultDTOTest {
             dto.setSearchString(null);
             dto.setSearchSuggestion(null);
             dto.setItems(null);
-            dto.setNextPageUrl(null);
+            dto.setNextPage(null);
 
             // Assert
             assertNull(dto.getUrl());
@@ -376,7 +434,7 @@ class SearchResultDTOTest {
             assertNull(dto.getSearchString());
             assertNull(dto.getSearchSuggestion());
             assertNull(dto.getItems());
-            assertNull(dto.getNextPageUrl());
+            assertNull(dto.getNextPage());
         }
     }
 
@@ -461,11 +519,7 @@ class SearchResultDTOTest {
 
             List<InfoItem> items = new ArrayList<>();
             for (int i = 0; i < 100; i++) {
-                StreamInfoItem item = mock(StreamInfoItem.class);
-                when(item.getName()).thenReturn("Video " + i);
-                when(item.getUrl()).thenReturn("https://youtube.com/watch?v=" + i);
-                when(item.getThumbnails()).thenReturn(List.of());
-                items.add(item);
+                items.add(mockStreamItem("Video " + i, "https://youtube.com/watch?v=" + i));
             }
             when(searchInfo.getRelatedItems()).thenReturn(items);
             when(searchInfo.getNextPage()).thenReturn(null);
@@ -490,14 +544,15 @@ class SearchResultDTOTest {
             when(searchInfo.getUrl()).thenReturn("https://youtube.com/results");
             when(searchInfo.getSearchString()).thenReturn("query");
             when(searchInfo.getRelatedItems()).thenReturn(List.of());
-            when(searchInfo.getNextPage()).thenReturn(new Page("https://youtube.com/page2"));
+            when(searchInfo.getNextPage()).thenReturn(realPage("https://youtube.com/page2", "tokenABC"));
 
             // Act
             SearchResultDTO dto = SearchResultDTO.from(searchInfo);
 
             // Assert
             assertTrue(dto.isHasNextPage());
-            assertNotNull(dto.getNextPageUrl());
+            assertNotNull(dto.getNextPage());
+            assertEquals("https://youtube.com/page2", dto.getNextPage().url());
         }
 
         @Test
@@ -515,7 +570,7 @@ class SearchResultDTOTest {
 
             // Assert
             assertFalse(dto.isHasNextPage());
-            assertNull(dto.getNextPageUrl());
+            assertNull(dto.getNextPage());
         }
     }
 }

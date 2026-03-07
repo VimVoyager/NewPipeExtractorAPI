@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 
-import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 
