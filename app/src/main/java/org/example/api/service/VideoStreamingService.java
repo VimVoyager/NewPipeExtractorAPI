@@ -31,7 +31,7 @@ public class VideoStreamingService {
             return StreamInfo.getInfo(url);
         } catch (Exception e) {
             logger.error("Failed to extract stream info for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -48,7 +48,7 @@ public class VideoStreamingService {
             return StreamInfo.getInfo(url).getAudioStreams();
         } catch (Exception e) {
             logger.error("Failed to extract audio streams for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -65,7 +65,7 @@ public class VideoStreamingService {
             return StreamInfo.getInfo(url).getVideoOnlyStreams();
         } catch (Exception e) {
             logger.error("Failed to extract video streams for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -84,7 +84,7 @@ public class VideoStreamingService {
             return dashUrl;
         } catch (Exception e) {
             logger.error("Failed to extract DASH MPD URL for: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -101,7 +101,7 @@ public class VideoStreamingService {
             return StreamInfo.getInfo(url).getThumbnails();
         } catch (Exception e) {
             logger.error("Failed to extract subtitle streams for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -118,7 +118,7 @@ public class VideoStreamingService {
             return StreamInfo.getInfo(url).getSubtitles();
         } catch (Exception e) {
             logger.error("Failed to extract subtitle streams for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -135,7 +135,7 @@ public class VideoStreamingService {
             return StreamInfo.getInfo(url).getStreamSegments();
         } catch (Exception e) {
             logger.error("Failed to extract stream segments for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -152,7 +152,7 @@ public class VideoStreamingService {
             return StreamInfo.getInfo(url).getPreviewFrames();
         } catch (Exception e) {
             logger.error("Failed to extract preview frames for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -169,7 +169,7 @@ public class VideoStreamingService {
             return StreamInfo.getInfo(url).getDescription();
         } catch (Exception e) {
             logger.error("Failed to extract stream description for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -186,7 +186,7 @@ public class VideoStreamingService {
             return StreamInfo.getInfo(url).getRelatedItems();
         } catch (Exception e) {
             logger.error("Failed to extract related streams for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 }

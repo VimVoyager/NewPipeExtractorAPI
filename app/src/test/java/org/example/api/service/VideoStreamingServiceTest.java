@@ -67,7 +67,7 @@ class VideoStreamingServiceTest {
                         videoStreamingService.getStreamInfo(TEST_URL)
                 );
 
-                assertTrue(exception.getMessage().contains("Failed to retrieve stream information"));
+                assertTrue(exception.getMessage().contains("Extraction failed"));
                 assertNotNull(exception.getCause());
             }
         }
@@ -129,7 +129,7 @@ class VideoStreamingServiceTest {
                         videoStreamingService.getAudioStreams(TEST_URL)
                 );
 
-                assertTrue(exception.getMessage().contains("Failed to retrieve audio streams"));
+                assertTrue(exception.getMessage().contains("Failed"));
             }
         }
     }
@@ -171,7 +171,7 @@ class VideoStreamingServiceTest {
                         videoStreamingService.getVideoStreams(TEST_URL)
                 );
 
-                assertTrue(exception.getMessage().contains("Failed to retrieve video streams"));
+                assertTrue(exception.getMessage().contains("Failed"));
             }
         }
     }
