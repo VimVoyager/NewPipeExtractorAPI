@@ -61,7 +61,7 @@ public class SearchService {
             return dto;
         } catch (Exception e) {
             logger.error("Failed to retrieve search results for: {}", searchString, e);
-            throw new ExtractionException("Failed to retrieve search results: " + e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
@@ -114,7 +114,7 @@ public class SearchService {
             return dto;
         } catch (Exception e) {
             logger.error("Failed to retrieve search page for: {}", searchString, e);
-            throw new ExtractionException("Failed to retrieve search page: " + e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e.getCause());
         }
     }
 
