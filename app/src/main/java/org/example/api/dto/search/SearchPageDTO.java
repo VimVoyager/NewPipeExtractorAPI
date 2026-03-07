@@ -49,14 +49,12 @@ public class SearchPageDTO {
     }
 
     // Helpers
-
     private static SearchResultDTO.PageDto buildNextPage(org.schabi.newpipe.extractor.Page page) {
         if (page == null || page.getUrl() == null) return null;
         return new SearchResultDTO.PageDto(page.getUrl(), page.getId());
     }
 
     // Getters and Setters
-
     public List<SearchItemDTO> getItems() { return items; }
     public void setItems(List<SearchItemDTO> items) { this.items = items; }
 
