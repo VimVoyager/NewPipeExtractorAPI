@@ -50,8 +50,8 @@ public class SearchService {
             SearchInfo info = SearchInfo.getInfo(extractor);
             SearchResultDTO dto = SearchResultDTO.from(info);
 
-            List<SearchItemDTO> videoItems = filterVideosOnly(dto.getItems());
-            List<SearchItemDTO> uniqueItems = deduplicateByUrl(videoItems);
+//            List<SearchItemDTO> videoItems = filterVideosOnly(dto.getItems());
+            List<SearchItemDTO> uniqueItems = deduplicateByUrl(dto.getItems());
             dto.setItems(uniqueItems);
 
             logger.info("Search completed. Found {} unique results", uniqueItems.size());
@@ -102,8 +102,8 @@ public class SearchService {
 
             SearchPageDTO dto = SearchPageDTO.from(page);
 
-            List<SearchItemDTO> videoItems = filterVideosOnly(dto.getItems());
-            List<SearchItemDTO> uniqueItems = deduplicateByUrl(videoItems);
+//            List<SearchItemDTO> videoItems = filterVideosOnly(dto.getItems());
+            List<SearchItemDTO> uniqueItems = deduplicateByUrl(dto.getItems());
             dto.setItems(uniqueItems);
             dto.setItemCount(uniqueItems.size());
 
@@ -116,11 +116,11 @@ public class SearchService {
         }
     }
 
-    private List<SearchItemDTO> filterVideosOnly(List<SearchItemDTO> items) {
-        return items.stream()
-                .filter(item -> "stream".equalsIgnoreCase(item.getType()))
-                .collect(Collectors.toList());
-    }
+//    private List<SearchItemDTO> filterVideosOnly(List<SearchItemDTO> items) {
+//        return items.stream()
+//                .filter(item -> "stream".equalsIgnoreCase(item.getType()))
+//                .collect(Collectors.toList());
+//    }
 
     private List<SearchItemDTO> deduplicateByUrl(List<SearchItemDTO> items) {
         return new ArrayList<>(items.stream()
