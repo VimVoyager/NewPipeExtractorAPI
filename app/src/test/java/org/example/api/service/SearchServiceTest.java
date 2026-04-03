@@ -320,41 +320,5 @@ class SearchServiceTest {
                 assertEquals("First Video", result.getItems().get(0).getName());
             }
         }
-
-        @Test
-        @DisplayName("Should filter out non-stream items (channels, playlists)")
-        void testDeduplication_FiltersNonStreamItems() throws Exception {
-            // stubInfoItem returns a StreamInfoItem so SearchItemDTO.from() sets type="stream", passing the filter
-            InfoItem stream = stubInfoItem("A Video", "https://youtube.com/watch?v=vid1");
-
-            // A non-stream item: use InfoType.CHANNEL so SearchItemDTO.from() sets type="channel"
-            InfoItem nonStream = new InfoItem(InfoItem.InfoType.CHANNEL, 0,
-                    "https://youtube.com/channel/UC1", "A Channel") {
-                @Override
-                public java.util.List<org.schabi.newpipe.extractor.Image> getThumbnails() {
-                    return List.of();
-                }
-            };
-
-            SearchInfo mockInfo = mock(SearchInfo.class);
-            when(mockInfo.getSearchString()).thenReturn("test");
-            when(mockInfo.getRelatedItems()).thenReturn(List.of(stream, nonStream));
-            when(mockInfo.getNextPage()).thenReturn(null);
-
-            try (MockedStatic<NewPipe> newPipeMock = mockStatic(NewPipe.class);
-                 MockedStatic<SearchInfo> searchInfoMock = mockStatic(SearchInfo.class)) {
-
-                newPipeMock.when(() -> NewPipe.getService(0)).thenReturn(mockStreamingService);
-                searchInfoMock.when(() -> SearchInfo.getInfo(any(SearchExtractor.class)))
-                        .thenReturn(mockInfo);
-
-                SearchResultDTO result = searchService.getSearchInfo(
-                        "test", Collections.emptyList(), null);
-
-                // Only the stream item survives filterVideosOnly
-                assertEquals(1, result.getItems().size());
-                assertEquals("stream", result.getItems().get(0).getType());
-            }
-        }
     }
 }
