@@ -26,9 +26,44 @@ public class VideoStreamingService {
      * @throws ExtractionException if extraction fails
      */
     public StreamInfo getStreamInfo(String url) throws ExtractionException {
+        return getStreamInfo(url, 2);
+    }
+
+    /**
+     * Extracts StreamInfo with automatic retry when YouTube returns an incomplete
+     * response (0 video-only streams, 0 audio streams, but valid duration).
+     *
+     * This happens because NewPipe uses multiple internal client extractors
+     * (ANDROID, WEB, etc.) and non-deterministically hits a client that returns
+     * only a muxed stream instead of the full adaptive stream set.
+     * A single retry is sufficient — the second call almost always hits a
+     * different client path and returns the full stream list.
+     */
+
+    private StreamInfo getStreamInfo(String url, int attemptsRemaining) throws ExtractionException {
         try {
             logger.info("Extracting stream info for URL: {}", url);
-            return StreamInfo.getInfo(url);
+            StreamInfo info = StreamInfo.getInfo(url);
+
+            boolean hasAdaptiveStreams = !info.getVideoOnlyStreams().isEmpty() || !info.getAudioStreams().isEmpty();
+            boolean isValidResult = info.getDuration() > 0;
+
+            if (!hasAdaptiveStreams && isValidResult && attemptsRemaining > 1) {
+                logger.warn("Got incomplete streams for URL: {} (videoOnly={}, audio={}, muxed={}) — retrying ({} attempts remaining)",
+                        url,
+                        info.getVideoOnlyStreams().size(),
+                        info.getAudioStreams().size(),
+                        info.getVideoStreams().size(),
+                        attemptsRemaining - 1);
+                return getStreamInfo(url, attemptsRemaining - 1);
+            }
+            logger.info("Extracted streams for URL: {} (videoOnly={}, audio={}, muxed={})",
+                    url,
+                    info.getVideoOnlyStreams().size(),
+                    info.getAudioStreams().size(),
+                    info.getVideoStreams().size());
+
+            return info;
         } catch (Exception e) {
             logger.error("Failed to extract stream info for URL: {}", url, e);
             throw new ExtractionException(e.getMessage(), e);

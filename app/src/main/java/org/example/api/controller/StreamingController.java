@@ -139,7 +139,7 @@ public class StreamingController {
         streamSelectionService.logSelectedStreams(selectedVideoStreams, selectedAudioStreams);
         streamSelectionService.logSelectedSubtitles(selectedSubtitles);
 
-        // Build config from selected streams (CHANGED)
+        // Build config from selected streams
         DashManifestConfigDTO config = DashManifestConfigDTO.fromWithSelectedStreams(
                 streamInfo,
                 selectedVideoStreams,
@@ -147,14 +147,18 @@ public class StreamingController {
                 selectedSubtitles
         );
 
-        // Generate manifest XML with selected streams (CHANGED)
+        // Generate manifest XML with selected streams
         String manifest = dashManifestGeneratorService.generateManifestXml(config);
 
         logger.info("Generated optimized DASH manifest with {} characters (selected streams: {} video, {} audio, {} subtitle)",
                 manifest.length(), selectedVideoStreams.size(), selectedAudioStreams.size(), selectedSubtitles.size());
 
+//        return ResponseEntity.ok()
+//                .contentType(MediaType.APPLICATION_XML)
+//                .body(manifest);
+
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_XML)
+                .contentType(MediaType.parseMediaType("application/xml"))
                 .body(manifest);
     }
 
