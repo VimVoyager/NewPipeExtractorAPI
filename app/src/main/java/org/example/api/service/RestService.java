@@ -9,11 +9,8 @@ import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.kiosk.KioskInfo;
-import org.schabi.newpipe.extractor.playlist.PlaylistInfo;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 import org.schabi.newpipe.extractor.stream.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -23,7 +20,6 @@ import java.util.Map;
 
 @Service
 public class RestService {
-    private static final Logger logger = LoggerFactory.getLogger(RestService.class);
     private final ObjectMapper objectMapper;
 
     public RestService() {
@@ -62,28 +58,6 @@ public class RestService {
             return objectMapper.writeValueAsString(serviceList);
         } catch (Exception e) {
             System.err.println("Services Extraction Error:");
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    public String getPlaylistInfo(String url) throws Exception {
-        try {
-            PlaylistInfo info = PlaylistInfo.getInfo(url);
-            return objectMapper.writeValueAsString(info);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    public String getPlaylistPage( String url, String pageUrl) throws Exception {
-        try {
-            StreamingService service = NewPipe.getServiceByUrl(url);
-            Page pageInstance = new Page(pageUrl);
-            InfoItemsPage<StreamInfoItem> page = PlaylistInfo.getMoreItems(service, url, pageInstance);
-            return objectMapper.writeValueAsString(page);
-        } catch (Exception e) {
             e.printStackTrace();
             return getError(e);
         }
