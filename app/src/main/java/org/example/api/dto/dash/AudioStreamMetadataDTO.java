@@ -390,14 +390,6 @@ public class AudioStreamMetadataDTO {
 
     @Override
     public String toString() {
-        return "AudioStreamMetadataDTO{" +
-                "id='" + id + '\'' +
-                ", codec='" + codec + '\'' +
-                ", bandwidth=" + bandwidth +
-                ", audioSamplingRate='" + audioSamplingRate + '\'' +
-                ", audioChannels=" + audioChannels +
-                ", language='" + language + '\'' +
-                ", languageName='" + languageName + '\'' +
-                '}';
+        return "AudioStreamMetadataDTO{id='%s', codec='%s', bandwidth=%d, audioSamplingRate='%s', audioChannels=%d, language='%s', languageName='%s'}".formatted(id, codec, bandwidth, audioSamplingRate, audioChannels, language, languageName);
     }
 }
