@@ -11,6 +11,7 @@ import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.stream.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -130,6 +131,39 @@ public class StreamingController {
         logger.info("Retrieved {} video, {} audio, {} subtitle streams",
                 allVideoStreams.size(), allAudioStreams.size(), allSubtitles.size());
 
+        // SABR fallback: if adaptive streams are unavailable, use muxed streams (360p only)
+//        boolean isMuxedFallback = allVideoStreams.isEmpty() && allSubtitles.isEmpty();
+        boolean isMuxedFallback = true;
+
+        if (isMuxedFallback) {
+            List<VideoStream> muxedStreams = streamInfo.getVideoStreams();
+            logger.warn("No adaptive streams available for ID: {} - falling back to {} muxed stream(s)", id, muxedStreams.size());
+
+            if (muxedStreams.isEmpty()) {
+                logger.error("No streams available for ID: {}", id);
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("No streams available: YouTube may be blocking extraction for this video.");
+            }
+
+            // Select best muxed stream and wrap it
+            List<VideoStream> selectedMuxed = streamSelectionService.selectVideoStreams(muxedStreams);
+            streamSelectionService.logSelectedStreams(selectedMuxed, List.of());
+
+            DashManifestConfigDTO config = DashManifestConfigDTO.fromWithSelectedStreams(
+                    streamInfo,
+                    selectedMuxed,
+                    List.of(),
+                    streamSelectionService.selectSubtitles(allSubtitles)
+            );
+
+            String manifest = dashManifestGeneratorService.generateManifestXml(config);
+            logger.info("Generated muxed-fallback DASH manifest ({} chars, {} video stream(s))",
+                    manifest.length(), selectedMuxed.size());
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("application/xml"))
+                    .body(manifest);
+        }
+
         // Apply intelligent stream selection
         List<VideoStream> selectedVideoStreams = streamSelectionService.selectVideoStreams(allVideoStreams);
         List<AudioStream> selectedAudioStreams = streamSelectionService.selectAudioStreams(allAudioStreams);
@@ -152,10 +186,6 @@ public class StreamingController {
 
         logger.info("Generated optimized DASH manifest with {} characters (selected streams: {} video, {} audio, {} subtitle)",
                 manifest.length(), selectedVideoStreams.size(), selectedAudioStreams.size(), selectedSubtitles.size());
-
-//        return ResponseEntity.ok()
-//                .contentType(MediaType.APPLICATION_XML)
-//                .body(manifest);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/xml"))
