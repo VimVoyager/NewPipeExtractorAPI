@@ -132,9 +132,9 @@ public class StreamingController {
                 allVideoStreams.size(), allAudioStreams.size(), allSubtitles.size());
 
         // SABR fallback: if adaptive streams are unavailable, use muxed streams (360p only)
-//        boolean isMuxedFallback = allVideoStreams.isEmpty() && allSubtitles.isEmpty();
-        boolean isMuxedFallback = true;
-
+        boolean isMuxedFallback = allVideoStreams.isEmpty() && allSubtitles.isEmpty();
+//        boolean isMuxedFallback = true; // For testing SABR restriction fallback
+        
         if (isMuxedFallback) {
             List<VideoStream> muxedStreams = streamInfo.getVideoStreams();
             logger.warn("No adaptive streams available for ID: {} - falling back to {} muxed stream(s)", id, muxedStreams.size());
@@ -144,24 +144,12 @@ public class StreamingController {
                 return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("No streams available: YouTube may be blocking extraction for this video.");
             }
 
-            // Select best muxed stream and wrap it
-            List<VideoStream> selectedMuxed = streamSelectionService.selectVideoStreams(muxedStreams);
-            streamSelectionService.logSelectedStreams(selectedMuxed, List.of());
-
-            DashManifestConfigDTO config = DashManifestConfigDTO.fromWithSelectedStreams(
-                    streamInfo,
-                    selectedMuxed,
-                    List.of(),
-                    streamSelectionService.selectSubtitles(allSubtitles)
-            );
-
-            String manifest = dashManifestGeneratorService.generateManifestXml(config);
-            logger.info("Generated muxed-fallback DASH manifest ({} chars, {} video stream(s))",
-                    manifest.length(), selectedMuxed.size());
-
+            // Return the direct URL as plain text with a custom header
+            String directUrl = muxedStreams.get(0).getContent();
             return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType("application/xml"))
-                    .body(manifest);
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .header("X-Stream-Type", "muxed-progressive")
+                    .body(directUrl);
         }
 
         // Apply intelligent stream selection
