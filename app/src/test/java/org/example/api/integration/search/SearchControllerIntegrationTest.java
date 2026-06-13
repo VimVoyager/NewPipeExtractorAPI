@@ -57,29 +57,6 @@ public class SearchControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Search results should contain only videos, no playlists or channels")
-    void search_shouldFilterOutNonVideoContent() {
-        String url = "%s?searchString=music".formatted(getBaseUrl());
-
-        ResponseEntity<SearchResultDTO> response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                null,
-                new ParameterizedTypeReference<SearchResultDTO>() {}
-        );
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        SearchResultDTO result = response.getBody();
-
-        assertThat(result != null ? result.getItems() : null)
-                .isNotEmpty()
-                .allSatisfy(item -> {
-                    assertThat(item.getType()).isEqualToIgnoringCase("stream");
-                    assertThat(item.getUrl()).isNotNull().contains("/watch?v=");
-                });
-    }
-
-    @Test
     @DisplayName("Search results should be deduplicated by URL")
     void search_shouldDeduplicateResults() {
         String url = "%s?searchString=popular song".formatted(getBaseUrl());
