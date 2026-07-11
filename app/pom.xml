@@ -19,7 +19,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>api</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.1.0</version>
     <name>New Pipe Extractor API</name>
     <description>REST API for New Pipe Extractor</description>
 
