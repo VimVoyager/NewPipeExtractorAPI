@@ -5,10 +5,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.example.api.model.Error;
 import org.example.api.utils.SerializationUtils;
 import org.schabi.newpipe.extractor.NewPipe;
-import org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage;
-import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.StreamingService;
-import org.schabi.newpipe.extractor.kiosk.KioskInfo;
 import org.schabi.newpipe.extractor.search.SearchInfo;
 import org.schabi.newpipe.extractor.stream.*;
 import org.springframework.stereotype.Service;
@@ -63,43 +60,6 @@ public class RestService {
         }
     }
 
-    public String getKioskInfo(int serviceId, String kioskId) throws Exception {
-        try {
-            StreamingService service = NewPipe.getService(serviceId);
-            String url = service.getKioskList().getListLinkHandlerFactoryByType(kioskId).getUrl(kioskId);
-            KioskInfo info = KioskInfo.getInfo(service, url);
-            return objectMapper.writeValueAsString(info);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    public String getKioskPage(int serviceId, String kioskId, String pageUrl) throws Exception {
-        try {
-            StreamingService service = NewPipe.getService(serviceId);
-            Page pageInstance = new Page(pageUrl);
-            String url = service.getKioskList().getListLinkHandlerFactoryByType(kioskId).getUrl(kioskId);
-            InfoItemsPage<StreamInfoItem> page = KioskInfo.getMoreItems(service, url, pageInstance);
-            return objectMapper.writeValueAsString(page);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
-    public String getKioskIdsList(int serviceId) throws Exception {
-        try {
-            StreamingService service = NewPipe.getService(serviceId);
-            List<String> res = new ArrayList<>();
-            service.getKioskList().getAvailableKiosks().forEach(k -> res.add(k));
-            return objectMapper.writeValueAsString(res);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return getError(e);
-        }
-    }
-
     public String getError(Exception e) {
         String message = e.getMessage() != null ? e.getMessage() : "An error occurred";
         Error errorResponse = new Error(message);
@@ -109,6 +69,4 @@ public class RestService {
             return "{\"message\":\"Error serializing error response\"}";
         }
     }
-
-
 }
