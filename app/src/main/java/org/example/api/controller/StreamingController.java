@@ -42,29 +42,28 @@ public class StreamingController {
     }
 
     /**
+     * Builds the watch URL for a video id, validating both.
+     *
+     */
+    private String videoUrl(String id) {
+        ValidationUtils.requireNonEmpty(id, "id");
+        String url = YOUTUBE_URL + id;
+        ValidationUtils.requireValidUrl(url);
+        return url;
+    }
+
+    /**
      * Handles HTTP GET requests to retrieve stream information based on a provided ID.
      *
-     * This endpoint requires an ID as a request parameter. It constructs a URL using
-     * the ID and interacts with the RestService to fetch stream information.
-     * On success, a ResponseEntity with the stream information in JSON format
-     * is returned (HTTP 200 OK). If the ID parameter is missing or if an error occurs
-     * during retrieval, an appropriate error message is returned (HTTP 400 Bad Request
-     * or HTTP 500 Internal Server Error).
-     *
      * @param id The ID of the stream to retrieve information for.
-     * @return A ResponseEntity object containing either:
-     *                           - A success response with the stream information in JSON format if the retrieval is successful (HTTP 200 OK).
-     *                           - A bad request response if the ID parameter is missing (HTTP 400 Bad Request).
-     *                           - An error response with an appropriate message if an error occurs (HTTP 500 Internal Server Error).
+     * @return 200 with the stream information, 400 for a missing/empty id,
+     *         or an error response from the exception handler.
      */
     @GetMapping
     public ResponseEntity<StreamInfo> getStreamInfo(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving stream info for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        StreamInfo info = videoStreamingService.getStreamInfo(url);
+        StreamInfo info = videoStreamingService.getStreamInfo(videoUrl(id));
         return ResponseEntity.ok(info);
     }
 
@@ -75,10 +74,7 @@ public class StreamingController {
     public ResponseEntity<List<AudioStream>> getAudioStreams(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving audio stream for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        List<AudioStream> streams = videoStreamingService.getAudioStreams(url);
+        List<AudioStream> streams = videoStreamingService.getAudioStreams(videoUrl(id));
         return ResponseEntity.ok(streams);
     }
 
@@ -89,10 +85,7 @@ public class StreamingController {
     public ResponseEntity<List<VideoStream>> getVideoStreams(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving video stream for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        List<VideoStream> streams = videoStreamingService.getVideoStreams(url);
+        List<VideoStream> streams = videoStreamingService.getVideoStreams(videoUrl(id));
         return ResponseEntity.ok(streams);
     }
 
@@ -103,10 +96,7 @@ public class StreamingController {
     public ResponseEntity<String> getDashMpdUrl(@RequestParam(name = "id", required = true) String id) throws Exception {
         logger.info("Retrieving DASH MPD URL for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        String dashUrl = videoStreamingService.getDashMpdUrl(url);
+        String dashUrl = videoStreamingService.getDashMpdUrl(videoUrl(id));
         return ResponseEntity.ok(dashUrl);
     }
 
@@ -117,8 +107,7 @@ public class StreamingController {
     public ResponseEntity<String> getDashManifest(@RequestParam(name = "id", required = true) String id) {
         logger.info("Generating optimized DASH manifest for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
+        String url = videoUrl(id);
 
         // Get full stream information from NewPipe Extractor
         StreamInfo streamInfo = videoStreamingService.getStreamInfo(url);
@@ -133,8 +122,7 @@ public class StreamingController {
 
         // SABR fallback: if adaptive streams are unavailable, use muxed streams (360p only)
         boolean isMuxedFallback = allVideoStreams.isEmpty() && allSubtitles.isEmpty();
-//        boolean isMuxedFallback = true; // For testing SABR restriction fallback
-        
+
         if (isMuxedFallback) {
             List<VideoStream> muxedStreams = streamInfo.getVideoStreams();
             logger.warn("No adaptive streams available for ID: {} - falling back to {} muxed stream(s)", id, muxedStreams.size());
@@ -187,10 +175,7 @@ public class StreamingController {
     public ResponseEntity<List<Image>> getThumbnails(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving stream thumbnails for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        List<Image> thumbnails = videoStreamingService.getStreamThumbnails(url);
+        List<Image> thumbnails = videoStreamingService.getStreamThumbnails(videoUrl(id));
         return ResponseEntity.ok(thumbnails);
     }
 
@@ -201,10 +186,7 @@ public class StreamingController {
     public ResponseEntity<List<SubtitlesStream>> getSubtitleStreams(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving subtitle streams for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        List<SubtitlesStream> subtitles = videoStreamingService.getSubtitleStreams(url);
+        List<SubtitlesStream> subtitles = videoStreamingService.getSubtitleStreams(videoUrl(id));
         return ResponseEntity.ok(subtitles);
     }
 
@@ -215,10 +197,7 @@ public class StreamingController {
     public ResponseEntity<List<StreamSegment>> getStreamSegments(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving stream segments for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        List<StreamSegment> segments = videoStreamingService.getStreamSegments(url);
+        List<StreamSegment> segments = videoStreamingService.getStreamSegments(videoUrl(id));
         return ResponseEntity.ok(segments);
     }
 
@@ -229,10 +208,7 @@ public class StreamingController {
     public ResponseEntity<List<Frameset>> getPreviewFrames(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving preview frames stream for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        List<Frameset> frames = videoStreamingService.getPreviewFrames(url);
+        List<Frameset> frames = videoStreamingService.getPreviewFrames(videoUrl(id));
         return ResponseEntity.ok(frames);
     }
 
@@ -243,10 +219,7 @@ public class StreamingController {
     public ResponseEntity<Description> getStreamDescription(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving description stream for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        Description description = videoStreamingService.getStreamDescription(url);
+        Description description = videoStreamingService.getStreamDescription(videoUrl(id));
         return ResponseEntity.ok(description);
     }
 
@@ -257,13 +230,7 @@ public class StreamingController {
     public ResponseEntity<StreamDetailsDTO> getStreamDetails(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving stream details for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        // Get full stream info
-        StreamInfo info = videoStreamingService.getStreamInfo(url);
-
-        // Convert to DTO
+        StreamInfo info = videoStreamingService.getStreamInfo(videoUrl(id));
         StreamDetailsDTO details = StreamDetailsDTO.from(info);
 
         return ResponseEntity.ok(details);
@@ -276,10 +243,7 @@ public class StreamingController {
     public ResponseEntity<List<InfoItem>> getRelatedStreams(@RequestParam(name = "id", required = true) String id) {
         logger.info("Retrieving related streams for ID: {}", id);
 
-        String url = YOUTUBE_URL + id;
-        ValidationUtils.requireValidUrl(url);
-
-        List<InfoItem> relatedItems = videoStreamingService.getRelatedStreams(url);
+        List<InfoItem> relatedItems = videoStreamingService.getRelatedStreams(videoUrl(id));
         return ResponseEntity.ok(relatedItems);
     }
 }

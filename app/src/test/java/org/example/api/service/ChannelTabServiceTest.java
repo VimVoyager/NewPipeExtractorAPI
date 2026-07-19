@@ -70,9 +70,6 @@ class ChannelTabServiceTest {
                             ListLinkHandler tabHandler,
                             ChannelTabExtractor extractor) { }
 
-    // getChannelTabExtractor declares NewPipe's checked ExtractionException,
-    // and stubbing invokes the mocked method — hence throws Exception here
-    // (the simple name is taken by our own ExtractionException import).
     private TabMocks stubChannelWithTab(String channelUrl, String tab) throws Exception {
         ListLinkHandler handler = mock(ListLinkHandler.class);
         when(handler.getUrl()).thenReturn(channelUrl + "/" + tab);
@@ -217,7 +214,8 @@ class ChannelTabServiceTest {
             String pageBody = Base64.getEncoder().encodeToString(rawBody);
 
             TabMocks mocks = stubChannelWithTab(CHANNEL_URL, "videos");
-            when(mocks.extractor().getPage(any(Page.class))).thenReturn(mockEmptyPage());
+            InfoItemsPage<InfoItem> emptyPage = mockEmptyPage();
+            when(mocks.extractor().getPage(any(Page.class))).thenReturn(emptyPage);
 
             try (MockedStatic<NewPipe> newPipeMock = mockStatic(NewPipe.class);
                  MockedStatic<ChannelInfo> channelInfoMock = mockStatic(ChannelInfo.class)) {
@@ -248,7 +246,8 @@ class ChannelTabServiceTest {
         @DisplayName("Handles a null pageBody, sending a Page with a null body")
         void handlesNullPageBody() throws Exception {
             TabMocks mocks = stubChannelWithTab(CHANNEL_URL, "videos");
-            when(mocks.extractor().getPage(any(Page.class))).thenReturn(mockEmptyPage());
+            InfoItemsPage<InfoItem> emptyPage = mockEmptyPage();
+            when(mocks.extractor().getPage(any(Page.class))).thenReturn(emptyPage);
 
             try (MockedStatic<NewPipe> newPipeMock = mockStatic(NewPipe.class);
                  MockedStatic<ChannelInfo> channelInfoMock = mockStatic(ChannelInfo.class)) {
