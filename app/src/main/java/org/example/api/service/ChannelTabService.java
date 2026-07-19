@@ -67,7 +67,7 @@ public class ChannelTabService {
             throw e;
         } catch (Exception e) {
             logger.error("Failed to fetch channel tab '{}' for URL: {}", tab, channelUrl, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
@@ -133,7 +133,7 @@ public class ChannelTabService {
             throw e;
         } catch (Exception e) {
             logger.error("Failed to fetch channel tab page for tab '{}', channelId: {}", tab, channelId, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 
