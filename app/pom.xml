@@ -32,8 +32,6 @@
         <okhttp.version>5.4.0</okhttp.version>
         <jspecify.version>1.0.0</jspecify.version>
         <jacoco.version>0.8.13</jacoco.version>
-
-        <excluded.test.groups>live</excluded.test.groups>
     </properties>
 
     <dependencies>
@@ -107,7 +105,6 @@
                         <exclude>**/*IT.java</exclude>
                         <exclude>**/*IntegrationTest.java</exclude>
                     </excludes>
-                    <excludedGroups>${excluded.test.groups}</excludedGroups>
                 </configuration>
             </plugin>
             <plugin>
@@ -116,10 +113,7 @@
                 <configuration>
                     <includes>
                         <include>**/*IT.java</include>
-                        <!-- Transitional: current class names, until renamed -->
-                        <include>**/*IntegrationTest.java</include>
                     </includes>
-                    <excludedGroups>${excluded.test.groups}</excludedGroups>
                 </configuration>
                 <executions>
                     <execution>
@@ -170,29 +164,5 @@
             </plugin>
         </plugins>
     </build>
-
-    <profiles>
-        <!-- Opt-in live smoke tests against real YouTube.
-             Usage:  mvn verify -Plive-it -->
-        <profile>
-            <id>live-it</id>
-            <properties>
-                <!-- Lift the exclusion... -->
-                <excluded.test.groups/>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-failsafe-plugin</artifactId>
-                        <configuration>
-                            <!-- ...and run ONLY the live-tagged tests -->
-                            <groups>live</groups>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 
 </project>
