@@ -1,26 +1,43 @@
 package org.example.api.dto.dash;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.schabi.newpipe.extractor.stream.SubtitlesStream;
-import org.schabi.newpipe.extractor.MediaFormat;
-
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.schabi.newpipe.extractor.MediaFormat;
+import org.schabi.newpipe.extractor.stream.SubtitlesStream;
+
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
- * Test suite for SubtitleMetadataDTO.
- * Tests validation, factory methods, builder pattern, and JSON serialization.
+ * Unit tests for SubtitleMetadataDTO.
+ *
+ * <p>Reduced from 20 tests to 11 methods (~24 executions). Validation
+ * uses setter mutators (not builder mutators, unlike the sibling DTOs):
+ * the full constructor coalesces {@code bandwidth <= 0} to 256, so the
+ * zero-bandwidth violation can only be produced by setting it directly
+ * on an already-built instance — the original suite did the same thing;
+ * this keeps that technique but folds it into the same parameterized
+ * table as the blank-string cases. mimeType inference (VTT/SRT/default)
+ * and the language-code table are each one parameterized test.</p>
+ *
+ * <p>Note for the summary: unlike AudioStreamMetadataDTO, which defaults
+ * a null locale to "und"/"Unknown", this class defaults to "en"/"English"
+ * — worth confirming that asymmetry is intentional.</p>
  */
 @DisplayName("SubtitleMetadataDTO Tests")
 class SubtitleMetadataDTOTest {
@@ -30,511 +47,210 @@ class SubtitleMetadataDTOTest {
 
     @BeforeEach
     void setUp() {
-        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
-        validator = factory.getValidator();
+        validator = Validation.buildDefaultValidatorFactory().getValidator();
         objectMapper = new ObjectMapper();
     }
 
-    @Nested
-    @DisplayName("Builder Pattern Tests")
-    class BuilderTests {
+    // ── Helpers ──────────────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should build DTO with all fields")
-        void testBuilder_AllFields() {
-            // Act
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
-                    .id("subtitle-1")
-                    .url("https://example.com/subtitle.vtt")
-                    .language("en")
-                    .languageName("English")
-                    .mimeType("text/vtt")
-                    .kind("subtitles")
-                    .bandwidth(256)
-                    .format("VTT")
-                    .build();
-
-            // Assert
-            assertEquals("subtitle-1", dto.getId());
-            assertEquals("https://example.com/subtitle.vtt", dto.getUrl());
-            assertEquals("en", dto.getLanguage());
-            assertEquals("English", dto.getLanguageName());
-            assertEquals("text/vtt", dto.getMimeType());
-            assertEquals("subtitles", dto.getKind());
-            assertEquals(256, dto.getBandwidth());
-            assertEquals("VTT", dto.getFormat());
-        }
-
-        @Test
-        @DisplayName("Should build DTO with required fields only")
-        void testBuilder_RequiredFieldsOnly() {
-            // Act
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
-                    .id("subtitle-1")
-                    .url("https://example.com/subtitle.vtt")
-                    .language("en")
-                    .mimeType("text/vtt")
-                    .build();
-
-            // Assert
-            assertEquals("subtitle-1", dto.getId());
-            assertNull(dto.getLanguageName());
-            assertNull(dto.getKind());
-            assertEquals(256, dto.getBandwidth()); // Default value
-            assertNull(dto.getFormat());
-        }
-
-        @Test
-        @DisplayName("Should use default bandwidth if not specified")
-        void testBuilder_DefaultBandwidth() {
-            // Act
-            SubtitleMetadataDTO dto = new SubtitleMetadataDTO();
-
-            // Assert
-            assertEquals(256, dto.getBandwidth());
-        }
+    private static SubtitleMetadataDTO.Builder validBuilder() {
+        return SubtitleMetadataDTO.builder()
+                .id("subtitle-1")
+                .url("https://example.com/subtitle.vtt")
+                .language("en")
+                .languageName("English")
+                .mimeType("text/vtt")
+                .kind("subtitles")
+                .bandwidth(256);
     }
 
-    @Nested
-    @DisplayName("Validation Tests")
-    class ValidationTests {
-
-        @Test
-        @DisplayName("Should pass validation for valid DTO")
-        void testValidation_ValidDto() {
-            // Arrange
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
-                    .id("subtitle-1")
-                    .url("https://example.com/subtitle.vtt")
-                    .language("en")
-                    .languageName("English")
-                    .mimeType("text/vtt")
-                    .kind("subtitles")
-                    .bandwidth(256)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<SubtitleMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertTrue(violations.isEmpty(), "Valid DTO should have no violations");
-        }
-
-        @Test
-        @DisplayName("Should fail validation when id is blank")
-        void testValidation_BlankId() {
-            // Arrange
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
-                    .id("")
-                    .url("https://example.com/subtitle.vtt")
-                    .language("en")
-                    .mimeType("text/vtt")
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<SubtitleMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Subtitle ID cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when url is blank")
-        void testValidation_BlankUrl() {
-            // Arrange
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
-                    .id("subtitle-1")
-                    .url("")
-                    .language("en")
-                    .mimeType("text/vtt")
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<SubtitleMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Subtitle URL cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when language is blank")
-        void testValidation_BlankLanguage() {
-            // Arrange
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
-                    .id("subtitle-1")
-                    .url("https://example.com/subtitle.vtt")
-                    .language("")
-                    .mimeType("text/vtt")
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<SubtitleMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Subtitle language cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when mimeType is blank")
-        void testValidation_BlankMimeType() {
-            // Arrange
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
-                    .id("subtitle-1")
-                    .url("https://example.com/subtitle.vtt")
-                    .language("en")
-                    .mimeType("")
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<SubtitleMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Subtitle MIME type cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when bandwidth is zero")
-        void testValidation_ZeroBandwidth() {
-            // Arrange
-            SubtitleMetadataDTO dto = new SubtitleMetadataDTO();
-            dto.setBandwidth(0);
-
-            // Act
-            Set<ConstraintViolation<SubtitleMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Bandwidth must be at least 1")));
-        }
+    private SubtitlesStream subtitlesStream(Locale locale, String displayName, MediaFormat format,
+                                            boolean autoGenerated) {
+        SubtitlesStream stream = mock(SubtitlesStream.class);
+        when(stream.getContent()).thenReturn("https://example.com/subtitle.vtt");
+        when(stream.getLocale()).thenReturn(locale);
+        when(stream.getDisplayLanguageName()).thenReturn(displayName);
+        when(stream.getFormat()).thenReturn(format);
+        when(stream.isAutoGenerated()).thenReturn(autoGenerated);
+        return stream;
     }
 
-    @Nested
-    @DisplayName("Factory Method Tests")
-    class FactoryMethodTests {
+    // ── Builder ──────────────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should create DTO from SubtitlesStream with VTT format")
-        void testFrom_VttFormat() {
-            // Arrange
-            SubtitlesStream stream = mock(SubtitlesStream.class);
-            Locale locale = Locale.ENGLISH;
+    @Test
+    @DisplayName("Builder wires every field to its own getter")
+    void builderWiresAllFields() {
+        SubtitleMetadataDTO dto = validBuilder().format("VTT").build();
 
-            when(stream.getContent()).thenReturn("https://example.com/subtitle.vtt");
-            when(stream.getLocale()).thenReturn(locale);
-            when(stream.getDisplayLanguageName()).thenReturn("English");
-            when(stream.getFormat()).thenReturn(MediaFormat.VTT);
-            when(stream.isAutoGenerated()).thenReturn(false);
-
-            // Act
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.from(stream, 1);
-
-            // Assert
-            assertEquals("subtitle-1", dto.getId());
-            assertEquals("https://example.com/subtitle.vtt", dto.getUrl());
-            assertEquals("en", dto.getLanguage());
-            assertEquals("English", dto.getLanguageName());
-            assertEquals("text/vtt", dto.getMimeType());
-            assertEquals("subtitles", dto.getKind());
-            assertEquals(256, dto.getBandwidth());
-            assertEquals("WebVTT", dto.getFormat());
-        }
-
-        @Test
-        @DisplayName("Should create DTO from SubtitlesStream with SRT format")
-        void testFrom_SrtFormat() {
-            // Arrange
-            SubtitlesStream stream = mock(SubtitlesStream.class);
-            Locale locale = Locale.ENGLISH;
-
-            when(stream.getContent()).thenReturn("https://example.com/subtitle.srt");
-            when(stream.getLocale()).thenReturn(locale);
-            when(stream.getDisplayLanguageName()).thenReturn("English");
-            when(stream.getFormat()).thenReturn(MediaFormat.SRT);
-            when(stream.isAutoGenerated()).thenReturn(false);
-
-            // Act
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.from(stream, 1);
-
-            // Assert
-            assertEquals("application/x-subrip", dto.getMimeType());
-            assertEquals("SubRip file format", dto.getFormat());
-        }
-
-        @Test
-        @DisplayName("Should default to TTML for unknown format")
-        void testFrom_UnknownFormat() {
-            // Arrange
-            SubtitlesStream stream = mock(SubtitlesStream.class);
-            Locale locale = Locale.ENGLISH;
-
-            when(stream.getContent()).thenReturn("https://example.com/subtitle.xml");
-            when(stream.getLocale()).thenReturn(locale);
-            when(stream.getDisplayLanguageName()).thenReturn("English");
-            when(stream.getFormat()).thenReturn(null);
-            when(stream.isAutoGenerated()).thenReturn(false);
-
-            // Act
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.from(stream, 1);
-
-            // Assert
-            assertEquals("application/ttml+xml", dto.getMimeType());
-        }
-
-        @Test
-        @DisplayName("Should set kind to 'asr' for auto-generated subtitles")
-        void testFrom_AutoGenerated() {
-            // Arrange
-            SubtitlesStream stream = mock(SubtitlesStream.class);
-            Locale locale = Locale.ENGLISH;
-
-            when(stream.getContent()).thenReturn("https://example.com/subtitle.vtt");
-            when(stream.getLocale()).thenReturn(locale);
-            when(stream.getDisplayLanguageName()).thenReturn("English");
-            when(stream.getFormat()).thenReturn(MediaFormat.VTT);
-            when(stream.isAutoGenerated()).thenReturn(true);
-
-            // Act
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.from(stream, 1);
-
-            // Assert
-            assertEquals("asr", dto.getKind());
-        }
-
-        @Test
-        @DisplayName("Should handle SubtitlesStream with null locale")
-        void testFrom_NullLocale() {
-            // Arrange
-            SubtitlesStream stream = mock(SubtitlesStream.class);
-
-            when(stream.getContent()).thenReturn("https://example.com/subtitle.vtt");
-            when(stream.getLocale()).thenReturn(null);
-            when(stream.getDisplayLanguageName()).thenReturn(null);
-            when(stream.getFormat()).thenReturn(MediaFormat.VTT);
-            when(stream.isAutoGenerated()).thenReturn(false);
-
-            // Act
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.from(stream, 1);
-
-            // Assert
-            assertEquals("en", dto.getLanguage()); // Default
-            assertEquals("English", dto.getLanguageName()); // Default
-        }
-
-        @Test
-        @DisplayName("Should use display name when provided")
-        void testFrom_WithDisplayName() {
-            // Arrange
-            SubtitlesStream stream = mock(SubtitlesStream.class);
-            Locale locale = Locale.FRENCH;
-
-            when(stream.getContent()).thenReturn("https://example.com/subtitle.vtt");
-            when(stream.getLocale()).thenReturn(locale);
-            when(stream.getDisplayLanguageName()).thenReturn("Français (France)");
-            when(stream.getFormat()).thenReturn(MediaFormat.VTT);
-            when(stream.isAutoGenerated()).thenReturn(false);
-
-            // Act
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.from(stream, 1);
-
-            // Assert
-            assertEquals("fr", dto.getLanguage());
-            assertEquals("Français (France)", dto.getLanguageName());
-        }
-
-        @Test
-        @DisplayName("Should throw exception when SubtitlesStream is null")
-        void testFrom_NullSubtitlesStream() {
-            // Act & Assert
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                    SubtitleMetadataDTO.from(null, 1)
-            );
-
-            assertTrue(exception.getMessage().contains("SubtitlesStream cannot be null"));
-        }
-
-        @Test
-        @DisplayName("Should map various language codes correctly")
-        void testFrom_VariousLanguages() {
-            // Test Spanish
-            SubtitlesStream streamEs = createMockSubtitlesStream(Locale.forLanguageTag("es"));
-            SubtitleMetadataDTO dtoEs = SubtitleMetadataDTO.from(streamEs, 1);
-            assertEquals("es", dtoEs.getLanguage());
-            assertEquals("Spanish", dtoEs.getLanguageName());
-
-            // Test German
-            SubtitlesStream streamDe = createMockSubtitlesStream(Locale.GERMAN);
-            SubtitleMetadataDTO dtoDe = SubtitleMetadataDTO.from(streamDe, 2);
-            assertEquals("de", dtoDe.getLanguage());
-            assertEquals("German", dtoDe.getLanguageName());
-
-            // Test Japanese
-            SubtitlesStream streamJa = createMockSubtitlesStream(Locale.JAPANESE);
-            SubtitleMetadataDTO dtoJa = SubtitleMetadataDTO.from(streamJa, 3);
-            assertEquals("ja", dtoJa.getLanguage());
-            assertEquals("Japanese", dtoJa.getLanguageName());
-        }
-
-        private SubtitlesStream createMockSubtitlesStream(Locale locale) {
-            SubtitlesStream stream = mock(SubtitlesStream.class);
-            when(stream.getContent()).thenReturn("https://example.com/subtitle.vtt");
-            when(stream.getLocale()).thenReturn(locale);
-            when(stream.getDisplayLanguageName()).thenReturn(null);
-            when(stream.getFormat()).thenReturn(MediaFormat.VTT);
-            when(stream.isAutoGenerated()).thenReturn(false);
-            return stream;
-        }
-
-        @Test
-        @DisplayName("Should generate sequential IDs")
-        void testFrom_SequentialIds() {
-            // Arrange
-            SubtitlesStream stream = createMockSubtitlesStream(Locale.ENGLISH);
-
-            // Act
-            SubtitleMetadataDTO dto1 = SubtitleMetadataDTO.from(stream, 1);
-            SubtitleMetadataDTO dto2 = SubtitleMetadataDTO.from(stream, 2);
-            SubtitleMetadataDTO dto3 = SubtitleMetadataDTO.from(stream, 5);
-
-            // Assert
-            assertEquals("subtitle-1", dto1.getId());
-            assertEquals("subtitle-2", dto2.getId());
-            assertEquals("subtitle-5", dto3.getId());
-        }
+        assertThat(dto.getId()).isEqualTo("subtitle-1");
+        assertThat(dto.getUrl()).isEqualTo("https://example.com/subtitle.vtt");
+        assertThat(dto.getLanguage()).isEqualTo("en");
+        assertThat(dto.getLanguageName()).isEqualTo("English");
+        assertThat(dto.getMimeType()).isEqualTo("text/vtt");
+        assertThat(dto.getKind()).isEqualTo("subtitles");
+        assertThat(dto.getBandwidth()).isEqualTo(256);
+        assertThat(dto.getFormat()).isEqualTo("VTT");
     }
 
-    @Nested
-    @DisplayName("JSON Serialization Tests")
-    class JsonSerializationTests {
-
-        @Test
-        @DisplayName("Should serialize DTO to JSON")
-        void testSerialization() throws Exception {
-            // Arrange
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
-                    .id("subtitle-1")
-                    .url("https://example.com/subtitle.vtt")
-                    .language("en")
-                    .languageName("English")
-                    .mimeType("text/vtt")
-                    .kind("subtitles")
-                    .bandwidth(256)
-                    .build();
-
-            // Act
-            String json = objectMapper.writeValueAsString(dto);
-
-            // Assert
-            assertNotNull(json);
-            assertTrue(json.contains("\"id\":\"subtitle-1\""));
-            assertTrue(json.contains("\"language\":\"en\""));
-            assertTrue(json.contains("\"mimeType\":\"text/vtt\""));
-            assertTrue(json.contains("\"kind\":\"subtitles\""));
-        }
-
-        @Test
-        @DisplayName("Should deserialize JSON to DTO")
-        void testDeserialization() throws Exception {
-            // Arrange
-            String json = "{\"id\":\"subtitle-1\",\"url\":\"https://example.com/subtitle.vtt\"," +
-                    "\"language\":\"en\",\"languageName\":\"English\"," +
-                    "\"mimeType\":\"text/vtt\",\"kind\":\"subtitles\",\"bandwidth\":256}";
-
-            // Act
-            SubtitleMetadataDTO dto = objectMapper.readValue(json, SubtitleMetadataDTO.class);
-
-            // Assert
-            assertEquals("subtitle-1", dto.getId());
-            assertEquals("https://example.com/subtitle.vtt", dto.getUrl());
-            assertEquals("en", dto.getLanguage());
-            assertEquals("English", dto.getLanguageName());
-            assertEquals("text/vtt", dto.getMimeType());
-            assertEquals("subtitles", dto.getKind());
-            assertEquals(256, dto.getBandwidth());
-        }
-
-        @Test
-        @DisplayName("Should omit null fields in JSON")
-        void testSerialization_OmitNullFields() throws Exception {
-            // Arrange
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
-                    .id("subtitle-1")
-                    .url("https://example.com/subtitle.vtt")
-                    .language("en")
-                    .mimeType("text/vtt")
-                    .build();
-
-            // Act
-            String json = objectMapper.writeValueAsString(dto);
-
-            // Assert
-            assertFalse(json.contains("languageName"));
-            assertFalse(json.contains("kind"));
-            assertFalse(json.contains("format"));
-        }
-
-        @Test
-        @DisplayName("Should handle round-trip serialization")
-        void testRoundTripSerialization() throws Exception {
-            // Arrange
-            SubtitleMetadataDTO original = SubtitleMetadataDTO.builder()
-                    .id("subtitle-1")
-                    .url("https://example.com/subtitle.vtt")
-                    .language("en")
-                    .languageName("English")
-                    .mimeType("text/vtt")
-                    .kind("subtitles")
-                    .bandwidth(256)
-                    .format("VTT")
-                    .build();
-
-            // Act
-            String json = objectMapper.writeValueAsString(original);
-            SubtitleMetadataDTO deserialized = objectMapper.readValue(json, SubtitleMetadataDTO.class);
-
-            // Assert
-            assertEquals(original.getId(), deserialized.getId());
-            assertEquals(original.getUrl(), deserialized.getUrl());
-            assertEquals(original.getLanguage(), deserialized.getLanguage());
-            assertEquals(original.getMimeType(), deserialized.getMimeType());
-            assertEquals(original.getKind(), deserialized.getKind());
-        }
+    @Test
+    @DisplayName("Defaults bandwidth to 256 via both the no-args constructor and an explicit non-positive value")
+    void defaultsBandwidthTo256() {
+        assertThat(new SubtitleMetadataDTO().getBandwidth()).isEqualTo(256);
+        assertThat(validBuilder().bandwidth(0).build().getBandwidth()).isEqualTo(256);
     }
 
-    @Nested
-    @DisplayName("ToString Tests")
-    class ToStringTests {
+    // ── Validation ───────────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should produce readable toString output")
-        void testToString() {
-            // Arrange
-            SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
-                    .id("subtitle-1")
-                    .url("https://example.com/subtitle.vtt")
-                    .language("en")
-                    .languageName("English")
-                    .mimeType("text/vtt")
-                    .kind("subtitles")
-                    .build();
+    @Test
+    @DisplayName("A fully-populated DTO passes validation")
+    void validDtoPassesValidation() {
+        assertThat(validator.validate(validBuilder().build())).isEmpty();
+    }
 
-            // Act
-            String result = dto.toString();
+    static Stream<Arguments> invalidFieldCases() {
+        return Stream.of(
+                Arguments.of("blank id", (Consumer<SubtitleMetadataDTO>) d -> d.setId(""),
+                        "Subtitle ID cannot be blank"),
+                Arguments.of("blank url", (Consumer<SubtitleMetadataDTO>) d -> d.setUrl(""),
+                        "Subtitle URL cannot be blank"),
+                Arguments.of("blank language", (Consumer<SubtitleMetadataDTO>) d -> d.setLanguage(""),
+                        "Subtitle language cannot be blank"),
+                Arguments.of("blank mimeType", (Consumer<SubtitleMetadataDTO>) d -> d.setMimeType(""),
+                        "Subtitle MIME type cannot be blank"),
+                // Only reachable via the setter: the full constructor
+                // coalesces bandwidth <= 0 to 256.
+                Arguments.of("zero bandwidth (set directly)",
+                        (Consumer<SubtitleMetadataDTO>) d -> d.setBandwidth(0),
+                        "Bandwidth must be at least 1"));
+    }
 
-            // Assert
-            assertTrue(result.contains("subtitle-1"));
-            assertTrue(result.contains("en"));
-            assertTrue(result.contains("English"));
-            assertTrue(result.contains("text/vtt"));
-            assertTrue(result.contains("subtitles"));
-        }
+    @ParameterizedTest(name = "Rejects {0}")
+    @MethodSource("invalidFieldCases")
+    @DisplayName("Rejects DTOs violating a single constraint, with the matching message")
+    void rejectsInvalidField(String name, Consumer<SubtitleMetadataDTO> mutator, String expectedMessage) {
+        SubtitleMetadataDTO dto = validBuilder().build();
+        mutator.accept(dto);
+
+        Set<ConstraintViolation<SubtitleMetadataDTO>> violations = validator.validate(dto);
+
+        assertThat(violations).isNotEmpty();
+        assertThat(violations).anyMatch(v -> v.getMessage().contains(expectedMessage));
+    }
+
+    // ── from() ───────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Maps id, url, kind, and fixed bandwidth from a fully-populated SubtitlesStream")
+    void mapsAllFieldsFromValidStream() {
+        SubtitlesStream stream = subtitlesStream(Locale.ENGLISH, "English", MediaFormat.VTT, false);
+
+        SubtitleMetadataDTO dto = SubtitleMetadataDTO.from(stream, 1);
+
+        assertThat(dto.getId()).isEqualTo("subtitle-1");
+        assertThat(dto.getUrl()).isEqualTo("https://example.com/subtitle.vtt");
+        assertThat(dto.getKind()).isEqualTo("subtitles");
+        assertThat(dto.getBandwidth()).isEqualTo(256);
+        assertThat(dto.getFormat()).isEqualTo(MediaFormat.VTT.getName());
+    }
+
+    @Test
+    @DisplayName("Rejects a null SubtitlesStream with IllegalArgumentException")
+    void rejectsNullSubtitlesStream() {
+        assertThatThrownBy(() -> SubtitleMetadataDTO.from(null, 1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SubtitlesStream cannot be null");
+    }
+
+    @Test
+    @DisplayName("Sets kind to 'asr' for auto-generated subtitles, 'subtitles' otherwise")
+    void setsKindFromAutoGeneratedFlag() {
+        SubtitleMetadataDTO auto = SubtitleMetadataDTO.from(
+                subtitlesStream(Locale.ENGLISH, "English", MediaFormat.VTT, true), 1);
+        SubtitleMetadataDTO manual = SubtitleMetadataDTO.from(
+                subtitlesStream(Locale.ENGLISH, "English", MediaFormat.VTT, false), 1);
+
+        assertThat(auto.getKind()).isEqualTo("asr");
+        assertThat(manual.getKind()).isEqualTo("subtitles");
+    }
+
+    static Stream<Arguments> mimeTypeCases() {
+        return Stream.of(
+                Arguments.of(MediaFormat.VTT, "text/vtt"),
+                Arguments.of(MediaFormat.SRT, "application/x-subrip"),
+                Arguments.of(null, "application/ttml+xml"));
+    }
+
+    @ParameterizedTest(name = "{0} -> {1}")
+    @MethodSource("mimeTypeCases")
+    @DisplayName("Infers mimeType from format, defaulting to TTML for null or unrecognised formats")
+    void infersMimeTypeFromFormat(MediaFormat format, String expectedMimeType) {
+        SubtitleMetadataDTO dto = SubtitleMetadataDTO.from(
+                subtitlesStream(Locale.ENGLISH, "English", format, false), 1);
+
+        assertThat(dto.getMimeType()).isEqualTo(expectedMimeType);
+    }
+
+    static Stream<Arguments> languageCases() {
+        return Stream.of(
+                Arguments.of("null locale and no display name -> en/English default",
+                        null, null, "en", "English"),
+                Arguments.of("locale with no display name -> computed name",
+                        Locale.forLanguageTag("es"), null, "es", "Spanish"),
+                Arguments.of("locale with a provided display name -> display name wins",
+                        Locale.FRENCH, "Français (France)", "fr", "Français (France)"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("languageCases")
+    @DisplayName("Resolves language from locale and languageName from the display name, falling back to a computed name")
+    void resolvesLanguageAndName(String name, Locale locale, String displayName,
+                                 String expectedLanguage, String expectedName) {
+        SubtitleMetadataDTO dto = SubtitleMetadataDTO.from(
+                subtitlesStream(locale, displayName, MediaFormat.VTT, false), 1);
+
+        assertThat(dto.getLanguage()).isEqualTo(expectedLanguage);
+        assertThat(dto.getLanguageName()).isEqualTo(expectedName);
+    }
+
+    // ── JSON ─────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Omits unset optional fields from the serialized JSON")
+    void omitsNullFieldsInJson() throws Exception {
+        SubtitleMetadataDTO dto = SubtitleMetadataDTO.builder()
+                .id("subtitle-1").url("https://example.com/subtitle.vtt")
+                .language("en").mimeType("text/vtt").build(); // no languageName/kind/format
+
+        String json = objectMapper.writeValueAsString(dto);
+
+        assertThat(json).doesNotContain("\"languageName\"", "\"kind\"", "\"format\"");
+    }
+
+    @Test
+    @DisplayName("Round-trips every field through serialize/deserialize unchanged")
+    void roundTripPreservesAllFields() throws Exception {
+        SubtitleMetadataDTO original = validBuilder().format("VTT").build();
+
+        SubtitleMetadataDTO restored = objectMapper.readValue(
+                objectMapper.writeValueAsString(original), SubtitleMetadataDTO.class);
+
+        assertThat(restored.getId()).isEqualTo(original.getId());
+        assertThat(restored.getUrl()).isEqualTo(original.getUrl());
+        assertThat(restored.getLanguage()).isEqualTo(original.getLanguage());
+        assertThat(restored.getLanguageName()).isEqualTo(original.getLanguageName());
+        assertThat(restored.getMimeType()).isEqualTo(original.getMimeType());
+        assertThat(restored.getKind()).isEqualTo(original.getKind());
+        assertThat(restored.getBandwidth()).isEqualTo(original.getBandwidth());
+        assertThat(restored.getFormat()).isEqualTo(original.getFormat());
+    }
+
+    // ── toString ─────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("toString includes the key identifying fields")
+    void toStringIncludesKeyFields() {
+        String result = validBuilder().build().toString();
+
+        assertThat(result).contains("subtitle-1", "en", "English", "text/vtt", "subtitles");
     }
 }

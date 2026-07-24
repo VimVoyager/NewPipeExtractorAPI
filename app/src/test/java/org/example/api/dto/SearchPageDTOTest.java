@@ -3,25 +3,23 @@ package org.example.api.dto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.api.dto.search.SearchItemDTO;
 import org.example.api.dto.search.SearchPageDTO;
-import org.example.api.dto.search.SearchResultDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.ListExtractor;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
+import org.schabi.newpipe.extractor.stream.StreamType;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
- * Test suite for SearchPageDTO.
- * Tests pagination, mapping from InfoItemsPage, and JSON serialization.
+ * Unit tests for SearchPageDTO.
  */
 @DisplayName("SearchPageDTO Tests")
 class SearchPageDTOTest {
@@ -33,391 +31,93 @@ class SearchPageDTOTest {
         objectMapper = new ObjectMapper();
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
+    // ── Helpers ──────────────────────────────────────────────────────────
 
-    private Page mockPage(String url, String id) {
-        Page page = mock(Page.class);
-        when(page.getUrl()).thenReturn(url);
-        when(page.getId()).thenReturn(id);
+    private InfoItem streamItem(String name, String url) {
+        return new StreamInfoItem(0, url, name, StreamType.VIDEO_STREAM) {
+            @Override
+            public List<org.schabi.newpipe.extractor.Image> getThumbnails() {
+                return List.of();
+            }
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private ListExtractor.InfoItemsPage<InfoItem> infoItemsPage(List<InfoItem> items, Page nextPage) {
+        ListExtractor.InfoItemsPage<InfoItem> page = mock(ListExtractor.InfoItemsPage.class);
+        when(page.getItems()).thenReturn(items);
+        when(page.getNextPage()).thenReturn(nextPage);
         return page;
     }
 
-    private List<InfoItem> createMockStreamItems(int count) {
-        List<InfoItem> items = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            StreamInfoItem item = mock(StreamInfoItem.class);
-            when(item.getName()).thenReturn("Video " + i);
-            when(item.getUrl()).thenReturn("https://youtube.com/watch?v=test" + i);
-            when(item.getThumbnails()).thenReturn(List.of());
-            items.add(item);
-        }
-        return items;
+    // ── from() ───────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Maps items (as type=stream) and a present cursor, with itemCount matching the item list")
+    void mapsItemsAndCursorWhenNextPageExists() {
+        List<InfoItem> items = List.of(
+                streamItem("Video 1", "https://youtube.com/watch?v=1"),
+                streamItem("Video 2", "https://youtube.com/watch?v=2"));
+        Page nextPage = new Page("https://youtube.com/search?q=test&page=2", "4qmFsgJcEBIYdmlkZW8continuation");
+
+        SearchPageDTO dto = SearchPageDTO.from(infoItemsPage(items, nextPage));
+
+        assertThat(dto.getItemCount()).isEqualTo(2);
+        assertThat(dto.getItems()).extracting(SearchItemDTO::getType).containsExactly("stream", "stream");
+        assertThat(dto.isHasNextPage()).isTrue();
+        assertThat(dto.getNextPage().url()).isEqualTo("https://youtube.com/search?q=test&page=2");
+        assertThat(dto.getNextPage().id()).isEqualTo("4qmFsgJcEBIYdmlkZW8continuation");
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
+    @Test
+    @DisplayName("Maps an empty final page to zero items and no cursor")
+    void mapsEmptyPageWithoutNextPage() {
+        SearchPageDTO dto = SearchPageDTO.from(infoItemsPage(List.of(), null));
 
-    @Nested
-    @DisplayName("Factory Method Tests")
-    class FactoryMethodTests {
-
-        @Test
-        @DisplayName("Should create DTO from InfoItemsPage with next page")
-        @SuppressWarnings("unchecked")
-        void testFrom_WithNextPage() {
-            // Arrange
-            List<InfoItem> items = createMockStreamItems(5);
-            String token = "4qmFsgJcEBIYdmlkZW8continuation";
-            Page nextPage = mockPage("https://youtube.com/search?q=test&page=2", token);
-
-            ListExtractor.InfoItemsPage<InfoItem> page = mock(ListExtractor.InfoItemsPage.class);
-            when(page.getItems()).thenReturn(items);
-            when(page.getNextPage()).thenReturn(nextPage);
-
-            // Act
-            SearchPageDTO dto = SearchPageDTO.from(page);
-
-            // Assert
-            assertEquals(5, dto.getItemCount());
-            assertEquals(5, dto.getItems().size());
-            assertTrue(dto.isHasNextPage());
-            assertNotNull(dto.getNextPage());
-            assertEquals("https://youtube.com/search?q=test&page=2", dto.getNextPage().url());
-            assertEquals(token, dto.getNextPage().id());
-        }
-
-        @Test
-        @DisplayName("Should create DTO from InfoItemsPage without next page")
-        @SuppressWarnings("unchecked")
-        void testFrom_WithoutNextPage() {
-            // Arrange
-            List<InfoItem> items = createMockStreamItems(3);
-
-            ListExtractor.InfoItemsPage<InfoItem> page = mock(ListExtractor.InfoItemsPage.class);
-            when(page.getItems()).thenReturn(items);
-            when(page.getNextPage()).thenReturn(null);
-
-            // Act
-            SearchPageDTO dto = SearchPageDTO.from(page);
-
-            // Assert
-            assertEquals(3, dto.getItemCount());
-            assertFalse(dto.isHasNextPage());
-            assertNull(dto.getNextPage());
-        }
-
-        @Test
-        @DisplayName("Should create DTO from empty page")
-        @SuppressWarnings("unchecked")
-        void testFrom_EmptyPage() {
-            // Arrange
-            ListExtractor.InfoItemsPage<InfoItem> page = mock(ListExtractor.InfoItemsPage.class);
-            when(page.getItems()).thenReturn(List.of());
-            when(page.getNextPage()).thenReturn(null);
-
-            // Act
-            SearchPageDTO dto = SearchPageDTO.from(page);
-
-            // Assert
-            assertEquals(0, dto.getItemCount());
-            assertTrue(dto.getItems().isEmpty());
-            assertFalse(dto.isHasNextPage());
-        }
-
-        @Test
-        @DisplayName("Should map all items correctly")
-        @SuppressWarnings("unchecked")
-        void testFrom_ItemMapping() {
-            // Arrange
-            List<InfoItem> items = createMockStreamItems(2);
-
-            ListExtractor.InfoItemsPage<InfoItem> page = mock(ListExtractor.InfoItemsPage.class);
-            when(page.getItems()).thenReturn(items);
-            when(page.getNextPage()).thenReturn(null);
-
-            // Act
-            SearchPageDTO dto = SearchPageDTO.from(page);
-
-            // Assert
-            assertEquals(2, dto.getItems().size());
-            assertEquals("stream", dto.getItems().get(0).getType());
-            assertEquals("stream", dto.getItems().get(1).getType());
-        }
-
-        @Test
-        @DisplayName("Should set id to null when Page has no id")
-        @SuppressWarnings("unchecked")
-        void testFrom_NullBody() {
-            // Arrange
-            Page nextPage = mockPage("https://youtube.com/browse", (String) null);
-
-            ListExtractor.InfoItemsPage<InfoItem> page = mock(ListExtractor.InfoItemsPage.class);
-            when(page.getItems()).thenReturn(List.of());
-            when(page.getNextPage()).thenReturn(nextPage);
-
-            // Act
-            SearchPageDTO dto = SearchPageDTO.from(page);
-
-            // Assert
-            assertNotNull(dto.getNextPage());
-            assertEquals("https://youtube.com/browse", dto.getNextPage().url());
-            assertNull(dto.getNextPage().id());
-        }
+        assertThat(dto.getItemCount()).isZero();
+        assertThat(dto.getItems()).isEmpty();
+        assertThat(dto.isHasNextPage()).isFalse();
+        assertThat(dto.getNextPage()).isNull();
     }
 
-    @Nested
-    @DisplayName("Pagination Tests")
-    class PaginationTests {
+    @Test
+    @DisplayName("Sets the cursor's id to null when the Page carries no continuation token")
+    void setsNextPageIdToNullWhenPageHasNoId() {
+        Page nextPage = new Page("https://youtube.com/browse", (String) null);
 
-        @Test
-        @DisplayName("Should handle first page with next page available")
-        @SuppressWarnings("unchecked")
-        void testFirstPage() {
-            // Arrange
-            List<InfoItem> items = createMockStreamItems(20);
-            Page nextPage = mockPage("https://youtube.com/search?page=2", "token");
+        SearchPageDTO dto = SearchPageDTO.from(infoItemsPage(List.of(), nextPage));
 
-            ListExtractor.InfoItemsPage<InfoItem> page = mock(ListExtractor.InfoItemsPage.class);
-            when(page.getItems()).thenReturn(items);
-            when(page.getNextPage()).thenReturn(nextPage);
-
-            // Act
-            SearchPageDTO dto = SearchPageDTO.from(page);
-
-            // Assert
-            assertEquals(20, dto.getItemCount());
-            assertTrue(dto.isHasNextPage());
-            assertNotNull(dto.getNextPage());
-            assertEquals("https://youtube.com/search?page=2", dto.getNextPage().url());
-        }
-
-        @Test
-        @DisplayName("Should handle last page without next page")
-        @SuppressWarnings("unchecked")
-        void testLastPage() {
-            // Arrange
-            List<InfoItem> items = createMockStreamItems(10);
-
-            ListExtractor.InfoItemsPage<InfoItem> page = mock(ListExtractor.InfoItemsPage.class);
-            when(page.getItems()).thenReturn(items);
-            when(page.getNextPage()).thenReturn(null);
-
-            // Act
-            SearchPageDTO dto = SearchPageDTO.from(page);
-
-            // Assert
-            assertEquals(10, dto.getItemCount());
-            assertFalse(dto.isHasNextPage());
-            assertNull(dto.getNextPage());
-        }
-
-        @Test
-        @DisplayName("Should handle middle page with next page")
-        @SuppressWarnings("unchecked")
-        void testMiddlePage() {
-            // Arrange
-            List<InfoItem> items = createMockStreamItems(20);
-            Page nextPage = mockPage("https://youtube.com/search?page=5", "tok");
-
-            ListExtractor.InfoItemsPage<InfoItem> page = mock(ListExtractor.InfoItemsPage.class);
-            when(page.getItems()).thenReturn(items);
-            when(page.getNextPage()).thenReturn(nextPage);
-
-            // Act
-            SearchPageDTO dto = SearchPageDTO.from(page);
-
-            // Assert
-            assertTrue(dto.isHasNextPage());
-            assertTrue(dto.getNextPage().url().contains("page=5"));
-        }
+        assertThat(dto.getNextPage()).isNotNull();
+        assertThat(dto.getNextPage().url()).isEqualTo("https://youtube.com/browse");
+        assertThat(dto.getNextPage().id()).isNull();
     }
 
-    @Nested
-    @DisplayName("JSON Serialization Tests")
-    class JsonSerializationTests {
+    // ── JSON ─────────────────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should serialize nextPage as object with url and id fields")
-        void testSerialize_NextPageObject() throws Exception {
-            // Arrange
-            SearchPageDTO dto = new SearchPageDTO();
-            dto.setItems(List.of());
-            dto.setItemCount(0);
-            dto.setHasNextPage(true);
-            dto.setNextPage(new SearchResultDTO.PageDto("https://next-page.com", "bodyBase64=="));
+    @Test
+    @DisplayName("Serializes nextPage as an object when present, and as null when absent")
+    void serializesNextPageAsObjectOrNull() throws Exception {
+        SearchPageDTO withPage = SearchPageDTO.from(infoItemsPage(List.of(),
+                new Page("https://next-page.com", "bodyBase64==")));
+        SearchPageDTO withoutPage = SearchPageDTO.from(infoItemsPage(List.of(), null));
 
-            // Act
-            String json = objectMapper.writeValueAsString(dto);
-
-            // Assert
-            assertTrue(json.contains("\"nextPage\":{"));
-            assertTrue(json.contains("\"url\""));
-            assertTrue(json.contains("\"id\""));
-            assertTrue(json.contains("https://next-page.com"));
-            assertTrue(json.contains("\"itemCount\":0"));
-        }
-
-        @Test
-        @DisplayName("Should serialize nextPage as null on last page")
-        void testSerialize_NullNextPage() throws Exception {
-            // Arrange
-            SearchPageDTO dto = new SearchPageDTO();
-            dto.setItems(List.of());
-            dto.setItemCount(0);
-            dto.setHasNextPage(false);
-            dto.setNextPage(null);
-
-            // Act
-            String json = objectMapper.writeValueAsString(dto);
-
-            // Assert
-            assertTrue(json.contains("\"nextPage\":null"));
-            assertTrue(json.contains("\"hasNextPage\":false"));
-        }
-
-        @Test
-        @DisplayName("Should handle round-trip serialization")
-        void testRoundTrip() throws Exception {
-            // Arrange
-            SearchPageDTO original = new SearchPageDTO();
-            original.setItems(List.of());
-            original.setItemCount(5);
-            original.setHasNextPage(false);
-            original.setNextPage(null);
-
-            // Act
-            String json = objectMapper.writeValueAsString(original);
-            SearchPageDTO deserialized = objectMapper.readValue(json, SearchPageDTO.class);
-
-            // Assert
-            assertEquals(original.getItemCount(), deserialized.getItemCount());
-            assertEquals(original.isHasNextPage(), deserialized.isHasNextPage());
-            assertNull(deserialized.getNextPage());
-        }
+        assertThat(objectMapper.writeValueAsString(withPage))
+                .contains("\"nextPage\":{", "\"url\"", "\"id\"", "https://next-page.com");
+        assertThat(objectMapper.writeValueAsString(withoutPage))
+                .contains("\"nextPage\":null", "\"hasNextPage\":false");
     }
 
-    @Nested
-    @DisplayName("Getter and Setter Tests")
-    class GetterSetterTests {
+    @Test
+    @DisplayName("Round-trips itemCount and hasNextPage through serialize/deserialize unchanged")
+    void roundTripPreservesFields() throws Exception {
+        SearchPageDTO original = SearchPageDTO.from(infoItemsPage(
+                List.of(streamItem("Video", "https://youtube.com/watch?v=1")), null));
 
-        @Test
-        @DisplayName("Should get and set items")
-        void testItems() {
-            // Arrange
-            SearchPageDTO dto = new SearchPageDTO();
-            List<SearchItemDTO> items = List.of(new SearchItemDTO(), new SearchItemDTO());
+        SearchPageDTO restored = objectMapper.readValue(
+                objectMapper.writeValueAsString(original), SearchPageDTO.class);
 
-            // Act
-            dto.setItems(items);
-
-            // Assert
-            assertEquals(2, dto.getItems().size());
-        }
-
-        @Test
-        @DisplayName("Should get and set nextPage")
-        void testNextPage() {
-            // Arrange
-            SearchPageDTO dto = new SearchPageDTO();
-            SearchResultDTO.PageDto pageDto = new SearchResultDTO.PageDto("https://next.com", "body==");
-
-            // Act
-            dto.setNextPage(pageDto);
-
-            // Assert
-            assertSame(pageDto, dto.getNextPage());
-            assertEquals("https://next.com", dto.getNextPage().url());
-            assertEquals("body==", dto.getNextPage().id());
-        }
-
-        @Test
-        @DisplayName("Should get and set hasNextPage")
-        void testHasNextPage() {
-            // Arrange
-            SearchPageDTO dto = new SearchPageDTO();
-
-            // Act
-            dto.setHasNextPage(true);
-
-            // Assert
-            assertTrue(dto.isHasNextPage());
-        }
-
-        @Test
-        @DisplayName("Should get and set itemCount")
-        void testItemCount() {
-            // Arrange
-            SearchPageDTO dto = new SearchPageDTO();
-
-            // Act
-            dto.setItemCount(42);
-
-            // Assert
-            assertEquals(42, dto.getItemCount());
-        }
-    }
-
-    @Nested
-    @DisplayName("Edge Cases Tests")
-    class EdgeCasesTests {
-
-        @Test
-        @DisplayName("Should handle null items list")
-        void testNullItems() {
-            // Arrange
-            SearchPageDTO dto = new SearchPageDTO();
-
-            // Act
-            dto.setItems(null);
-
-            // Assert
-            assertNull(dto.getItems());
-        }
-
-        @Test
-        @DisplayName("Should handle empty items list")
-        void testEmptyItems() {
-            // Arrange
-            SearchPageDTO dto = new SearchPageDTO();
-
-            // Act
-            dto.setItems(List.of());
-
-            // Assert
-            assertTrue(dto.getItems().isEmpty());
-        }
-
-        @Test
-        @DisplayName("Should handle large item count")
-        @SuppressWarnings("unchecked")
-        void testLargeItemCount() {
-            // Arrange
-            List<InfoItem> items = createMockStreamItems(1000);
-
-            ListExtractor.InfoItemsPage<InfoItem> page = mock(ListExtractor.InfoItemsPage.class);
-            when(page.getItems()).thenReturn(items);
-            when(page.getNextPage()).thenReturn(null);
-
-            // Act
-            SearchPageDTO dto = SearchPageDTO.from(page);
-
-            // Assert
-            assertEquals(1000, dto.getItemCount());
-            assertEquals(1000, dto.getItems().size());
-        }
-
-        @Test
-        @DisplayName("Should handle null next page")
-        void testNullNextPage() {
-            // Arrange
-            SearchPageDTO dto = new SearchPageDTO();
-
-            // Act
-            dto.setNextPage(null);
-            dto.setHasNextPage(false);
-
-            // Assert
-            assertNull(dto.getNextPage());
-            assertFalse(dto.isHasNextPage());
-        }
+        assertThat(restored.getItemCount()).isEqualTo(original.getItemCount());
+        assertThat(restored.isHasNextPage()).isEqualTo(original.isHasNextPage());
+        assertThat(restored.getNextPage()).isNull();
     }
 }

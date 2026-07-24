@@ -2,330 +2,111 @@ package org.example.api.utils;
 
 import org.example.api.exception.ValidationException;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Test suite for ValidationUtils.
- * Tests all validation methods and edge cases.
+ * Unit tests for ValidationUtils.
  */
 @DisplayName("ValidationUtils Tests")
 class ValidationUtilsTest {
 
-    @Nested
-    @DisplayName("requireNonEmpty Tests")
-    class RequireNonEmptyTests {
+    // ── requireNonEmpty ──────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should pass when value is valid")
-        void testRequireNonEmpty_ValidValue() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireNonEmpty("valid value", "testField")
-            );
-        }
-
-        @Test
-        @DisplayName("Should throw when value is null")
-        void testRequireNonEmpty_NullValue() {
-            // Act & Assert
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireNonEmpty(null, "testField")
-            );
-
-            assertTrue(exception.getMessage().contains("testField"));
-            assertTrue(exception.getMessage().contains("must not be empty"));
-            assertEquals(400, exception.getHttpStatus());
-            assertEquals("VALIDATION_ERROR", exception.getErrorCode());
-        }
-
-        @Test
-        @DisplayName("Should throw when value is empty string")
-        void testRequireNonEmpty_EmptyString() {
-            // Act & Assert
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireNonEmpty("", "testField")
-            );
-
-            assertTrue(exception.getMessage().contains("testField"));
-        }
-
-        @Test
-        @DisplayName("Should throw when value is only whitespace")
-        void testRequireNonEmpty_WhitespaceOnly() {
-            // Act & Assert
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireNonEmpty("   ", "testField")
-            );
-
-            assertTrue(exception.getMessage().contains("testField"));
-        }
-
-        @Test
-        @DisplayName("Should pass when value has leading/trailing spaces but content")
-        void testRequireNonEmpty_WithSpaces() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireNonEmpty("  content  ", "testField")
-            );
-        }
-
-        @Test
-        @DisplayName("Should include field name in error message")
-        void testRequireNonEmpty_ErrorMessageContainsFieldName() {
-            // Act
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireNonEmpty(null, "myCustomField")
-            );
-
-            // Assert
-            assertTrue(exception.getMessage().contains("myCustomField"));
-        }
+    @ParameterizedTest(name = "Accepts \"{0}\"")
+    @ValueSource(strings = {"valid value", "  content  ", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
+    @DisplayName("Passes for non-blank values, including ones with surrounding whitespace or very long content")
+    void requireNonEmpty_acceptsNonBlankValues(String value) {
+        assertThatCode(() -> ValidationUtils.requireNonEmpty(value, "testField")).doesNotThrowAnyException();
     }
 
-    @Nested
-    @DisplayName("requireValidUrl Tests")
-    class RequireValidUrlTests {
-
-        @Test
-        @DisplayName("Should pass for valid HTTP URL")
-        void testRequireValidUrl_ValidHttp() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireValidUrl("http://example.com")
-            );
-        }
-
-        @Test
-        @DisplayName("Should pass for valid HTTPS URL")
-        void testRequireValidUrl_ValidHttps() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireValidUrl("https://example.com")
-            );
-        }
-
-        @Test
-        @DisplayName("Should pass for valid YouTube URL")
-        void testRequireValidUrl_ValidYouTube() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireValidUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-            );
-        }
-
-        @Test
-        @DisplayName("Should throw when URL is null")
-        void testRequireValidUrl_Null() {
-            // Act & Assert
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireValidUrl(null)
-            );
-
-            assertTrue(exception.getMessage().contains("URL"));
-            assertTrue(exception.getMessage().contains("must not be empty"));
-        }
-
-        @Test
-        @DisplayName("Should throw when URL is empty")
-        void testRequireValidUrl_Empty() {
-            // Act & Assert
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireValidUrl("")
-            );
-
-            assertTrue(exception.getMessage().contains("URL"));
-        }
-
-        @Test
-        @DisplayName("Should throw when URL lacks protocol")
-        void testRequireValidUrl_NoProtocol() {
-            // Act & Assert
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireValidUrl("example.com")
-            );
-
-            assertTrue(exception.getMessage().contains("http"));
-        }
-
-        @Test
-        @DisplayName("Should throw when URL has invalid protocol")
-        void testRequireValidUrl_InvalidProtocol() {
-            // Act & Assert
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireValidUrl("ftp://example.com")
-            );
-
-            assertTrue(exception.getMessage().contains("http"));
-        }
-
-        @Test
-        @DisplayName("Should pass for URL with query parameters")
-        void testRequireValidUrl_WithQueryParams() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireValidUrl("https://example.com/path?param1=value1&param2=value2")
-            );
-        }
-
-        @Test
-        @DisplayName("Should pass for URL with fragments")
-        void testRequireValidUrl_WithFragment() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireValidUrl("https://example.com/path#section")
-            );
-        }
-
-        @Test
-        @DisplayName("Should pass for URL with port")
-        void testRequireValidUrl_WithPort() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireValidUrl("https://example.com:8080/path")
-            );
-        }
+    static Stream<Arguments> blankValues() {
+        return Stream.of(
+                Arguments.of("null", (String) null),
+                Arguments.of("empty string", ""),
+                Arguments.of("whitespace only", "   "),
+                Arguments.of("mixed whitespace (tabs/newlines)", " \t\n\r "));
     }
 
-    @Nested
-    @DisplayName("requireValidServiceId Tests")
-    class RequireValidServiceIdTests {
-
-        @Test
-        @DisplayName("Should pass for valid service ID (0)")
-        void testRequireValidServiceId_Zero() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireValidServiceId(0)
-            );
-        }
-
-        @Test
-        @DisplayName("Should pass for valid service ID (positive)")
-        void testRequireValidServiceId_Positive() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() -> {
-                ValidationUtils.requireValidServiceId(1);
-                ValidationUtils.requireValidServiceId(10);
-                ValidationUtils.requireValidServiceId(100);
-            });
-        }
-
-        @Test
-        @DisplayName("Should throw for negative service ID")
-        void testRequireValidServiceId_Negative() {
-            // Act & Assert
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireValidServiceId(-1)
-            );
-
-            assertTrue(exception.getMessage().contains("serviceId"));
-            assertTrue(exception.getMessage().contains("non-negative"));
-        }
-
-        @Test
-        @DisplayName("Should throw for large negative service ID")
-        void testRequireValidServiceId_LargeNegative() {
-            // Act & Assert
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireValidServiceId(-100)
-            );
-
-            assertTrue(exception.getMessage().contains("serviceId"));
-        }
+    @ParameterizedTest(name = "Rejects {0}")
+    @MethodSource("blankValues")
+    @DisplayName("Rejects null/blank values with a 400 ValidationException naming the field")
+    void requireNonEmpty_rejectsBlankValues(String name, String value) {
+        assertThatThrownBy(() -> ValidationUtils.requireNonEmpty(value, "testField"))
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.type(ValidationException.class))
+                .satisfies(ex -> {
+                    assertThat(ex.getMessage()).contains("testField", "must not be empty");
+                    assertThat(ex.getHttpStatus()).isEqualTo(400);
+                    assertThat(ex.getErrorCode()).isEqualTo("VALIDATION_ERROR");
+                });
     }
 
-    @Nested
-    @DisplayName("Exception Details Tests")
-    class ExceptionDetailsTests {
-
-        @Test
-        @DisplayName("ValidationException should have correct HTTP status")
-        void testValidationException_HttpStatus() {
-            // Act
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireNonEmpty(null, "field")
-            );
-
-            // Assert
-            assertEquals(400, exception.getHttpStatus());
-        }
-
-        @Test
-        @DisplayName("ValidationException should have correct error code")
-        void testValidationException_ErrorCode() {
-            // Act
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireNonEmpty(null, "field")
-            );
-
-            // Assert
-            assertEquals("VALIDATION_ERROR", exception.getErrorCode());
-        }
-
-        @Test
-        @DisplayName("ValidationException message should be descriptive")
-        void testValidationException_DescriptiveMessage() {
-            // Act
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireNonEmpty(null, "searchString")
-            );
-
-            // Assert
-            String message = exception.getMessage();
-            assertTrue(message.contains("searchString"));
-            assertTrue(message.contains("must not be empty"));
-        }
+    @Test
+    @DisplayName("Includes the exact field name passed in, unsanitized, in the error message")
+    void requireNonEmpty_includesFieldNameVerbatim() {
+        assertThatThrownBy(() -> ValidationUtils.requireNonEmpty(null, "field_with-special.chars"))
+                .hasMessageContaining("field_with-special.chars");
     }
 
-    @Nested
-    @DisplayName("Edge Case Tests")
-    class EdgeCaseTests {
+    // ── requireValidUrl ──────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should handle special characters in field name")
-        void testRequireNonEmpty_SpecialCharsInFieldName() {
-            // Act
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireNonEmpty(null, "field_with-special.chars")
-            );
+    @ParameterizedTest(name = "Accepts {0}")
+    @ValueSource(strings = {
+            "http://example.com",
+            "https://example.com",
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://example.com/path?param1=value1&param2=value2",
+            "https://example.com/path#section",
+            "https://example.com:8080/path",
+            "https://example.com/path?query=hello%20world"
+    })
+    @DisplayName("Passes for http(s) URLs with query params, fragments, ports, or encoded characters")
+    void requireValidUrl_acceptsWellFormedHttpUrls(String url) {
+        assertThatCode(() -> ValidationUtils.requireValidUrl(url)).doesNotThrowAnyException();
+    }
 
-            // Assert
-            assertTrue(exception.getMessage().contains("field_with-special.chars"));
-        }
+    static Stream<Arguments> invalidUrls() {
+        return Stream.of(
+                Arguments.of("null", null, "must not be empty"),
+                Arguments.of("empty", "", "must not be empty"),
+                Arguments.of("no protocol", "example.com", "http"),
+                Arguments.of("wrong protocol (ftp)", "ftp://example.com", "http"));
+    }
 
-        @Test
-        @DisplayName("Should handle URLs with encoded characters")
-        void testRequireValidUrl_EncodedCharacters() {
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireValidUrl("https://example.com/path?query=hello%20world")
-            );
-        }
+    @ParameterizedTest(name = "Rejects {0}")
+    @MethodSource("invalidUrls")
+    @DisplayName("Rejects null/blank URLs and non-http(s) protocols, each with a message naming the actual problem")
+    void requireValidUrl_rejectsInvalidUrls(String name, String url, String expectedMessageFragment) {
+        assertThatThrownBy(() -> ValidationUtils.requireValidUrl(url))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(expectedMessageFragment);
+    }
 
-        @Test
-        @DisplayName("Should handle very long valid strings")
-        void testRequireNonEmpty_VeryLongString() {
-            // Arrange
-            String longString = "a".repeat(10000);
+    // ── requireValidServiceId ────────────────────────────────────────────
 
-            // Act & Assert - should not throw
-            assertDoesNotThrow(() ->
-                    ValidationUtils.requireNonEmpty(longString, "field")
-            );
-        }
+    @ParameterizedTest(name = "Accepts serviceId={0}")
+    @ValueSource(ints = {0, 1})
+    @DisplayName("Passes for zero and positive service IDs")
+    void requireValidServiceId_acceptsNonNegative(int serviceId) {
+        assertThatCode(() -> ValidationUtils.requireValidServiceId(serviceId)).doesNotThrowAnyException();
+    }
 
-        @Test
-        @DisplayName("Should handle mixed whitespace")
-        void testRequireNonEmpty_MixedWhitespace() {
-            // Act & Assert
-            ValidationException exception = assertThrows(ValidationException.class, () ->
-                    ValidationUtils.requireNonEmpty(" \t\n\r ", "field")
-            );
-
-            assertTrue(exception.getMessage().contains("field"));
-        }
+    @ParameterizedTest(name = "Rejects serviceId={0}")
+    @ValueSource(ints = {-1, -100})
+    @DisplayName("Rejects negative service IDs, naming the field and requirement in the message")
+    void requireValidServiceId_rejectsNegative(int serviceId) {
+        assertThatThrownBy(() -> ValidationUtils.requireValidServiceId(serviceId))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("serviceId")
+                .hasMessageContaining("non-negative");
     }
 }

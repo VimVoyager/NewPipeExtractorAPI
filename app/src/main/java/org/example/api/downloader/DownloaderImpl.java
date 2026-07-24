@@ -17,8 +17,6 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
-import static org.sparkproject.jetty.util.StringUtil.isEmpty;
-
 public class DownloaderImpl extends Downloader {
     public static final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:43.0) Gecko/20100101 Firefox/43.0";
 
@@ -48,6 +46,10 @@ public class DownloaderImpl extends Downloader {
         mCookies = cookies;
     }
 
+    private static boolean isEmpty(@Nullable String value) {
+        return value == null || value.isEmpty();
+    }
+
     public long getContentLength(String url) throws IOException {
         try {
             final Response response = head(url);
@@ -56,7 +58,6 @@ public class DownloaderImpl extends Downloader {
                 throw new IOException("Content-Length header is missing");
             }
             return Long.parseLong(contentLength);
-//            return Long.parseLong(Objects.requireNonNull(response.getHeader("Content-Length")));
         } catch (NumberFormatException e) {
             throw new IOException("Invalid content length", e);
         } catch (ReCaptchaException e) {
@@ -79,6 +80,7 @@ public class DownloaderImpl extends Downloader {
             final ResponseBody body = response.body();
 
             if (response.code() == 429) {
+                response.close();
                 throw new ReCaptchaException("reCaptcha Challenge requested", siteUrl);
             }
 
@@ -129,7 +131,6 @@ public class DownloaderImpl extends Downloader {
 
             if (response.code() == 429) {
                 response.close();
-
                 throw new ReCaptchaException("reCaptcha Challenge requested", url);
             }
 

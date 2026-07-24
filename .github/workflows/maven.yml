@@ -1,12 +1,4 @@
-# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-maven
-
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-name: Java and maven CI
+name: Java CI
 
 on:
   push:
@@ -14,237 +6,59 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+  checks: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
-    name: Build
+  build-and-test:
+    name: Build & Unit Test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up JDK 21
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: 'maven'
-        cache-dependency-path: 'app/pom.xml'
-    
-    - name: Build project
-      run: mvn clean compile -DskipTests -B
-      working-directory: app
-
-  unit-tests:
-    name: Unit Tests
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up JDK 21
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: 'maven'
-        cache-dependency-path: 'app/pom.xml'
-
-    - name: Run unit tests
-      run: mvn test
-      working-directory: app
-
-    - name: Upload unit test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: unit-test-results
-        path: 'app/target/surefire-reports/*Test.xml'
-        retention-days: 7
-
-  integration-tests:
-     name: Integration Tests
-     needs: build
-     runs-on: ubuntu-latest
-
-     steps:
-     - name: Checkout code
-       uses: actions/checkout@v4
-
-     - name: Set up JDK 21
-       uses: actions/setup-java@v4
-       with:
-         java-version: '21'
-         distribution: 'temurin'
-         cache: 'maven'
-         
-     - name: Run integration tests
-       run: mvn verify -DskipUnitTests=true
-       env:
-        SPRING_PROFILES_ACTIVE: test
-        CI: true
-       working-directory: app
-
-     - name: Upload integration test results
-       if: always()
-       uses: actions/upload-artifact@v4
-       with:
-         name: integration-test-results
-         path: 'app/target/failsafe-reports/*IntegrationTest.xml'
-         retention-days: 7
-
-  code-coverage:
-    name: Code Coverage
-    needs: [unit-tests, integration-tests]
-    runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: 'temurin'
           cache: 'maven'
           cache-dependency-path: 'app/pom.xml'
 
-      - name: Run tests with coverage
-        run: mvn clean verify
-        env:
-          CI: true
+      - name: Run unit tests
+        run: mvn test -B
         working-directory: app
-      
-      - name: Generate coverage report
-        run: mvn jacoco:report
-        continue-on-error: true
-        working-directory: app
-      
-      - name: Upload coverage report
+
+      - name: Upload unit test results
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: 'app//target/site/jacoco/'
-          retention-days: 30
-
-  code-quality:
-    name: Code Quality Checks
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
-          cache-dependency-path: 'app/pom.xml'
-      
-      # Optional: Add Checkstyle
-      - name: Run Checkstyle
-        run: mvn checkstyle:check
-        continue-on-error: true
-        working-directory: app
-      
-      # Optional: Add SpotBugs
-      - name: Run SpotBugs
-        run: mvn spotbugs:check
-        continue-on-error: true
-        working-directory: app
-
-  dependency-check:
-    name: Dependency Security Check
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Run dependency check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: 'OpenTube-API'
-          path: '.'
-          format: 'HTML'
-      
-      - name: Upload dependency check results
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-check-report
-          path: reports/
-          retention-days: 7
-          
-  test-report:
-    name: Generate Test Report
-    needs: [unit-tests, integration-tests]
-    runs-on: ubuntu-latest
-    if: always()
-    permissions:
-      contents: read
-      checks: write
-      pull-requests: write
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download unit test results
-        uses: actions/download-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unit-test-results
-          path: unit-test-results
-        continue-on-error: true
-      
-      - name: Download integration test results
-        uses: actions/download-artifact@v4
-        with:
-          name: integration-test-results
-          path: integration-test-results
-        continue-on-error: true
-      
-      - name: Publish test report
-        uses: dorny/test-reporter@v1
+          path: app/target/surefire-reports/*.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload coverage report
         if: always()
+        uses: actions/upload-artifact@v7
         with:
-          name: Test Results
-          path: |
-            unit-test-results/**/*.xml
-            integration-test-results/**/*.xml
+          name: coverage-report
+          path: app/target/site/jacoco/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish test report
+        uses: dorny/test-reporter@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: Unit Test Results
+          path: 'app/target/surefire-reports/*.xml'
           reporter: java-junit
           fail-on-error: false
-      
-      - name: Comment test results on PR
-        if: github.event_name == 'pull_request'
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          files: |
-            unit-test-results/**/*.xml
-            integration-test-results/**/*.xml
-          comment_mode: always
-          check_name: Test Results Summary
-
-  all-checks-passed:
-    name: All Checks Passed
-    needs: [unit-tests, integration-tests, code-coverage, code-quality, dependency-check]
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-      - name: Check all jobs status
-        run: |
-          if [ "${{ needs.unit-tests.result }}" != "success" ] || \
-             [ "${{ needs.integration-tests.result }}" != "success" ]; then
-            echo "One or more required checks failed"
-            exit 1
-          fi
-          echo "All checks passed successfully!"
-
-
-

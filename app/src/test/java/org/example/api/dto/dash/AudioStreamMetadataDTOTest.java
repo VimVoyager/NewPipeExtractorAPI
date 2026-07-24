@@ -1,27 +1,31 @@
 package org.example.api.dto.dash;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.schabi.newpipe.extractor.stream.AudioStream;
-import org.schabi.newpipe.extractor.services.youtube.ItagItem;
-import org.schabi.newpipe.extractor.MediaFormat;
-
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.schabi.newpipe.extractor.MediaFormat;
+import org.schabi.newpipe.extractor.services.youtube.ItagItem;
+import org.schabi.newpipe.extractor.stream.AudioStream;
+
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
- * Test suite for AudioStreamMetadataDTO.
- * Tests validation, factory methods, builder pattern, and JSON serialization.
+ * Unit tests for AudioStreamMetadataDTO.
  */
 @DisplayName("AudioStreamMetadataDTO Tests")
 class AudioStreamMetadataDTOTest {
@@ -31,585 +35,240 @@ class AudioStreamMetadataDTOTest {
 
     @BeforeEach
     void setUp() {
-        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
-        validator = factory.getValidator();
+        validator = Validation.buildDefaultValidatorFactory().getValidator();
         objectMapper = new ObjectMapper();
     }
 
-    @Nested
-    @DisplayName("Builder Pattern Tests")
-    class BuilderTests {
+    // ── Helpers ──────────────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should build DTO with all fields")
-        void testBuilder_AllFields() {
-            // Act
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .language("en")
-                    .languageName("English")
-                    .initRange("0-722")
-                    .indexRange("723-898")
-                    .format("M4A")
-                    .build();
-
-            // Assert
-            assertEquals("audio-1", dto.getId());
-            assertEquals("https://example.com/audio.mp4", dto.getUrl());
-            assertEquals("mp4a.40.2", dto.getCodec());
-            assertEquals("audio/mp4", dto.getMimeType());
-            assertEquals(130482, dto.getBandwidth());
-            assertEquals("44100", dto.getAudioSamplingRate());
-            assertEquals(2, dto.getAudioChannels());
-            assertEquals("en", dto.getLanguage());
-            assertEquals("English", dto.getLanguageName());
-            assertEquals("0-722", dto.getInitRange());
-            assertEquals("723-898", dto.getIndexRange());
-            assertEquals("M4A", dto.getFormat());
-        }
-
-        @Test
-        @DisplayName("Should build DTO with required fields only")
-        void testBuilder_RequiredFieldsOnly() {
-            // Act
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .build();
-
-            // Assert
-            assertEquals("audio-1", dto.getId());
-            assertNull(dto.getLanguage());
-            assertNull(dto.getLanguageName());
-            assertNull(dto.getInitRange());
-            assertNull(dto.getIndexRange());
-            assertNull(dto.getFormat());
-        }
+    private static AudioStreamMetadataDTO.Builder validBuilder() {
+        return AudioStreamMetadataDTO.builder()
+                .id("audio-1")
+                .url("https://example.com/audio.mp4")
+                .codec("mp4a.40.2")
+                .mimeType("audio/mp4")
+                .bandwidth(130482)
+                .audioSamplingRate("44100")
+                .audioChannels(2)
+                .language("en")
+                .languageName("English");
     }
 
-    @Nested
-    @DisplayName("Validation Tests")
-    class ValidationTests {
-
-        @Test
-        @DisplayName("Should pass validation for valid DTO")
-        void testValidation_ValidDto() {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .language("en")
-                    .languageName("English")
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<AudioStreamMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertTrue(violations.isEmpty(), "Valid DTO should have no violations");
-        }
-
-        @Test
-        @DisplayName("Should fail validation when id is blank")
-        void testValidation_BlankId() {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<AudioStreamMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Audio stream ID cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when url is blank")
-        void testValidation_BlankUrl() {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<AudioStreamMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Audio stream URL cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when codec is blank")
-        void testValidation_BlankCodec() {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<AudioStreamMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Audio codec cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when mimeType is blank")
-        void testValidation_BlankMimeType() {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<AudioStreamMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Audio MIME type cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when audioSamplingRate is blank")
-        void testValidation_BlankSamplingRate() {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("")
-                    .audioChannels(2)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<AudioStreamMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Audio sampling rate cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when bandwidth is zero")
-        void testValidation_ZeroBandwidth() {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(0)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<AudioStreamMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Bandwidth must be at least 1")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when audioChannels is zero")
-        void testValidation_ZeroChannels() {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(0)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<AudioStreamMetadataDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Audio channels must be at least 1")));
-        }
+    private AudioStream audioStream(Locale locale, int audioChannels) {
+        AudioStream stream = mock(AudioStream.class);
+        MediaFormat format = mock(MediaFormat.class);
+        ItagItem itagItem = mock(ItagItem.class);
+        when(stream.getContent()).thenReturn("https://example.com/audio.mp4");
+        when(stream.getCodec()).thenReturn("mp4a.40.2");
+        when(stream.getFormat()).thenReturn(format);
+        when(format.getMimeType()).thenReturn("audio/mp4");
+        when(stream.getBitrate()).thenReturn(130482);
+        when(stream.getItagItem()).thenReturn(itagItem);
+        when(itagItem.getSampleRate()).thenReturn(44100);
+        when(itagItem.getAudioChannels()).thenReturn(audioChannels);
+        when(stream.getAudioLocale()).thenReturn(locale);
+        when(stream.getInitStart()).thenReturn(-1);
+        when(stream.getIndexStart()).thenReturn(-1);
+        return stream;
     }
 
-    @Nested
-    @DisplayName("Factory Method Tests")
-    class FactoryMethodTests {
+    // ── Builder ──────────────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should create DTO from AudioStream")
-        void testFrom_ValidAudioStream() {
-            // Arrange
-            AudioStream stream = mock(AudioStream.class);
-            MediaFormat format = mock(MediaFormat.class);
-            ItagItem itagItem = mock(ItagItem.class);
-            Locale locale = Locale.ENGLISH;
+    @Test
+    @DisplayName("Builder wires every field to its own getter")
+    void builderWiresAllFields() {
+        AudioStreamMetadataDTO dto = validBuilder()
+                .initRange("0-722").indexRange("723-898").format("M4A")
+                .build();
 
-            when(stream.getContent()).thenReturn("https://example.com/audio.mp4");
-            when(stream.getCodec()).thenReturn("mp4a.40.2");
-            when(stream.getFormat()).thenReturn(format);
-            when(format.getMimeType()).thenReturn("audio/mp4");
-            when(format.getName()).thenReturn("M4A");
-            when(stream.getBitrate()).thenReturn(130482);
-            when(stream.getItagItem()).thenReturn(itagItem);
-            when(itagItem.getSampleRate()).thenReturn(44100);
-            when(itagItem.getAudioChannels()).thenReturn(2);
-            when(stream.getAudioLocale()).thenReturn(locale);
-            when(stream.getInitStart()).thenReturn(0);
-            when(stream.getInitEnd()).thenReturn(722);
-            when(stream.getIndexStart()).thenReturn(723);
-            when(stream.getIndexEnd()).thenReturn(898);
-
-            // Act
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.from(stream, 1);
-
-            // Assert
-            assertEquals("audio-1", dto.getId());
-            assertEquals("https://example.com/audio.mp4", dto.getUrl());
-            assertEquals("mp4a.40.2", dto.getCodec());
-            assertEquals("audio/mp4", dto.getMimeType());
-            assertEquals(130482, dto.getBandwidth());
-            assertEquals("44100", dto.getAudioSamplingRate());
-            assertEquals(2, dto.getAudioChannels());
-            assertEquals("en", dto.getLanguage());
-            assertEquals("English", dto.getLanguageName());
-            assertEquals("0-722", dto.getInitRange());
-            assertEquals("723-898", dto.getIndexRange());
-            assertEquals("M4A", dto.getFormat());
-        }
-
-        @Test
-        @DisplayName("Should handle AudioStream with null locale")
-        void testFrom_NullLocale() {
-            // Arrange
-            AudioStream stream = mock(AudioStream.class);
-            MediaFormat format = mock(MediaFormat.class);
-            ItagItem itagItem = mock(ItagItem.class);
-
-            when(stream.getContent()).thenReturn("https://example.com/audio.mp4");
-            when(stream.getCodec()).thenReturn("mp4a.40.2");
-            when(stream.getFormat()).thenReturn(format);
-            when(format.getMimeType()).thenReturn("audio/mp4");
-            when(stream.getBitrate()).thenReturn(130482);
-            when(stream.getItagItem()).thenReturn(itagItem);
-            when(itagItem.getSampleRate()).thenReturn(44100);
-            when(itagItem.getAudioChannels()).thenReturn(2);
-            when(stream.getAudioLocale()).thenReturn(null);
-            when(stream.getInitStart()).thenReturn(-1);
-            when(stream.getIndexStart()).thenReturn(-1);
-
-            // Act
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.from(stream, 1);
-
-            // Assert
-            assertEquals("und", dto.getLanguage());
-            assertEquals("Unknown", dto.getLanguageName());
-        }
-
-        @Test
-        @DisplayName("Should handle AudioStream with null format")
-        void testFrom_NullFormat() {
-            // Arrange
-            AudioStream stream = mock(AudioStream.class);
-            ItagItem itagItem = mock(ItagItem.class);
-
-            when(stream.getContent()).thenReturn("https://example.com/audio.mp4");
-            when(stream.getCodec()).thenReturn("mp4a.40.2");
-            when(stream.getFormat()).thenReturn(null);
-            when(stream.getBitrate()).thenReturn(130482);
-            when(stream.getItagItem()).thenReturn(itagItem);
-            when(itagItem.getSampleRate()).thenReturn(44100);
-            when(itagItem.getAudioChannels()).thenReturn(2);
-            when(stream.getAudioLocale()).thenReturn(null);
-            when(stream.getInitStart()).thenReturn(-1);
-            when(stream.getIndexStart()).thenReturn(-1);
-
-            // Act
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.from(stream, 2);
-
-            // Assert
-            assertEquals("audio/mp4", dto.getMimeType()); // Default
-            assertNull(dto.getFormat());
-        }
-
-        @Test
-        @DisplayName("Should throw exception when AudioStream is null")
-        void testFrom_NullAudioStream() {
-            // Act & Assert
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                    AudioStreamMetadataDTO.from(null, 1)
-            );
-
-            assertTrue(exception.getMessage().contains("AudioStream cannot be null"));
-        }
-
-        @Test
-        @DisplayName("Should default to 2 channels when not specified")
-        void testFrom_DefaultChannels() {
-            // Arrange
-            AudioStream stream = mock(AudioStream.class);
-            MediaFormat format = mock(MediaFormat.class);
-            ItagItem itagItem = mock(ItagItem.class);
-
-            when(stream.getContent()).thenReturn("https://example.com/audio.mp4");
-            when(stream.getCodec()).thenReturn("mp4a.40.2");
-            when(stream.getFormat()).thenReturn(format);
-            when(format.getMimeType()).thenReturn("audio/mp4");
-            when(stream.getBitrate()).thenReturn(130482);
-            when(stream.getItagItem()).thenReturn(itagItem);
-            when(itagItem.getSampleRate()).thenReturn(44100);
-            when(itagItem.getAudioChannels()).thenReturn(0); // Not specified
-            when(stream.getAudioLocale()).thenReturn(null);
-            when(stream.getInitStart()).thenReturn(-1);
-            when(stream.getIndexStart()).thenReturn(-1);
-
-            // Act
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.from(stream, 1);
-
-            // Assert
-            assertEquals(2, dto.getAudioChannels()); // Default to stereo
-        }
-
-        @Test
-        @DisplayName("Should map various language codes correctly")
-        void testFrom_VariousLanguages() {
-            // Test Spanish
-            AudioStream streamEs = createMockAudioStream(Locale.forLanguageTag("es"));
-            AudioStreamMetadataDTO dtoEs = AudioStreamMetadataDTO.from(streamEs, 1);
-            assertEquals("es", dtoEs.getLanguage());
-            assertEquals("Spanish", dtoEs.getLanguageName());
-
-            // Test French
-            AudioStream streamFr = createMockAudioStream(Locale.FRENCH);
-            AudioStreamMetadataDTO dtoFr = AudioStreamMetadataDTO.from(streamFr, 2);
-            assertEquals("fr", dtoFr.getLanguage());
-            assertEquals("French", dtoFr.getLanguageName());
-
-            // Test German
-            AudioStream streamDe = createMockAudioStream(Locale.GERMAN);
-            AudioStreamMetadataDTO dtoDe = AudioStreamMetadataDTO.from(streamDe, 3);
-            assertEquals("de", dtoDe.getLanguage());
-            assertEquals("German", dtoDe.getLanguageName());
-        }
-
-        private AudioStream createMockAudioStream(Locale locale) {
-            AudioStream stream = mock(AudioStream.class);
-            MediaFormat format = mock(MediaFormat.class);
-            ItagItem itagItem = mock(ItagItem.class);
-
-            when(stream.getContent()).thenReturn("https://example.com/audio.mp4");
-            when(stream.getCodec()).thenReturn("mp4a.40.2");
-            when(stream.getFormat()).thenReturn(format);
-            when(format.getMimeType()).thenReturn("audio/mp4");
-            when(stream.getBitrate()).thenReturn(130482);
-            when(stream.getItagItem()).thenReturn(itagItem);
-            when(itagItem.getSampleRate()).thenReturn(44100);
-            when(itagItem.getAudioChannels()).thenReturn(2);
-            when(stream.getAudioLocale()).thenReturn(locale);
-            when(stream.getInitStart()).thenReturn(-1);
-            when(stream.getIndexStart()).thenReturn(-1);
-
-            return stream;
-        }
+        assertThat(dto.getId()).isEqualTo("audio-1");
+        assertThat(dto.getUrl()).isEqualTo("https://example.com/audio.mp4");
+        assertThat(dto.getCodec()).isEqualTo("mp4a.40.2");
+        assertThat(dto.getMimeType()).isEqualTo("audio/mp4");
+        assertThat(dto.getBandwidth()).isEqualTo(130482);
+        assertThat(dto.getAudioSamplingRate()).isEqualTo("44100");
+        assertThat(dto.getAudioChannels()).isEqualTo(2);
+        assertThat(dto.getLanguage()).isEqualTo("en");
+        assertThat(dto.getLanguageName()).isEqualTo("English");
+        assertThat(dto.getInitRange()).isEqualTo("0-722");
+        assertThat(dto.getIndexRange()).isEqualTo("723-898");
+        assertThat(dto.getFormat()).isEqualTo("M4A");
     }
 
-    @Nested
-    @DisplayName("JSON Serialization Tests")
-    class JsonSerializationTests {
+    // ── Validation ───────────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should serialize DTO to JSON")
-        void testSerialization() throws Exception {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .language("en")
-                    .languageName("English")
-                    .build();
-
-            // Act
-            String json = objectMapper.writeValueAsString(dto);
-
-            // Assert
-            assertNotNull(json);
-            assertTrue(json.contains("\"id\":\"audio-1\""));
-            assertTrue(json.contains("\"bandwidth\":130482"));
-            assertTrue(json.contains("\"audioChannels\":2"));
-            assertTrue(json.contains("\"language\":\"en\""));
-        }
-
-        @Test
-        @DisplayName("Should deserialize JSON to DTO")
-        void testDeserialization() throws Exception {
-            // Arrange
-            String json = "{\"id\":\"audio-1\",\"url\":\"https://example.com/audio.mp4\"," +
-                    "\"codec\":\"mp4a.40.2\",\"mimeType\":\"audio/mp4\"," +
-                    "\"bandwidth\":130482,\"audioSamplingRate\":\"44100\"," +
-                    "\"audioChannels\":2,\"language\":\"en\",\"languageName\":\"English\"}";
-
-            // Act
-            AudioStreamMetadataDTO dto = objectMapper.readValue(json, AudioStreamMetadataDTO.class);
-
-            // Assert
-            assertEquals("audio-1", dto.getId());
-            assertEquals("https://example.com/audio.mp4", dto.getUrl());
-            assertEquals("mp4a.40.2", dto.getCodec());
-            assertEquals("audio/mp4", dto.getMimeType());
-            assertEquals(130482, dto.getBandwidth());
-            assertEquals("44100", dto.getAudioSamplingRate());
-            assertEquals(2, dto.getAudioChannels());
-            assertEquals("en", dto.getLanguage());
-            assertEquals("English", dto.getLanguageName());
-        }
-
-        @Test
-        @DisplayName("Should omit null fields in JSON")
-        void testSerialization_OmitNullFields() throws Exception {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .build();
-
-            // Act
-            String json = objectMapper.writeValueAsString(dto);
-
-            // Assert
-            assertFalse(json.contains("language"));
-            assertFalse(json.contains("languageName"));
-            assertFalse(json.contains("initRange"));
-            assertFalse(json.contains("format"));
-        }
-
-        @Test
-        @DisplayName("Should handle round-trip serialization")
-        void testRoundTripSerialization() throws Exception {
-            // Arrange
-            AudioStreamMetadataDTO original = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .language("en")
-                    .languageName("English")
-                    .initRange("0-722")
-                    .indexRange("723-898")
-                    .format("M4A")
-                    .build();
-
-            // Act
-            String json = objectMapper.writeValueAsString(original);
-            AudioStreamMetadataDTO deserialized = objectMapper.readValue(json, AudioStreamMetadataDTO.class);
-
-            // Assert
-            assertEquals(original.getId(), deserialized.getId());
-            assertEquals(original.getUrl(), deserialized.getUrl());
-            assertEquals(original.getCodec(), deserialized.getCodec());
-            assertEquals(original.getBandwidth(), deserialized.getBandwidth());
-            assertEquals(original.getLanguage(), deserialized.getLanguage());
-        }
+    @Test
+    @DisplayName("A fully-populated DTO passes validation")
+    void validDtoPassesValidation() {
+        assertThat(validator.validate(validBuilder().build())).isEmpty();
     }
 
-    @Nested
-    @DisplayName("ToString Tests")
-    class ToStringTests {
+    static Stream<Arguments> invalidFieldCases() {
+        return Stream.of(
+                Arguments.of("blank id", (UnaryOperator<AudioStreamMetadataDTO.Builder>) b -> b.id(""),
+                        "Audio stream ID cannot be blank"),
+                Arguments.of("blank url", (UnaryOperator<AudioStreamMetadataDTO.Builder>) b -> b.url(""),
+                        "Audio stream URL cannot be blank"),
+                Arguments.of("blank codec", (UnaryOperator<AudioStreamMetadataDTO.Builder>) b -> b.codec(""),
+                        "Audio codec cannot be blank"),
+                Arguments.of("blank mimeType", (UnaryOperator<AudioStreamMetadataDTO.Builder>) b -> b.mimeType(""),
+                        "Audio MIME type cannot be blank"),
+                Arguments.of("blank audioSamplingRate",
+                        (UnaryOperator<AudioStreamMetadataDTO.Builder>) b -> b.audioSamplingRate(""),
+                        "Audio sampling rate cannot be blank"),
+                Arguments.of("zero bandwidth", (UnaryOperator<AudioStreamMetadataDTO.Builder>) b -> b.bandwidth(0),
+                        "Bandwidth must be at least 1"),
+                Arguments.of("zero audioChannels",
+                        (UnaryOperator<AudioStreamMetadataDTO.Builder>) b -> b.audioChannels(0),
+                        "Audio channels must be at least 1"));
+    }
 
-        @Test
-        @DisplayName("Should produce readable toString output")
-        void testToString() {
-            // Arrange
-            AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
-                    .id("audio-1")
-                    .url("https://example.com/audio.mp4")
-                    .codec("mp4a.40.2")
-                    .mimeType("audio/mp4")
-                    .bandwidth(130482)
-                    .audioSamplingRate("44100")
-                    .audioChannels(2)
-                    .language("en")
-                    .languageName("English")
-                    .build();
+    @ParameterizedTest(name = "Rejects {0}")
+    @MethodSource("invalidFieldCases")
+    @DisplayName("Rejects DTOs violating a single constraint, with the matching message")
+    void rejectsInvalidField(String name, UnaryOperator<AudioStreamMetadataDTO.Builder> mutator,
+                             String expectedMessage) {
+        Set<ConstraintViolation<AudioStreamMetadataDTO>> violations =
+                validator.validate(mutator.apply(validBuilder()).build());
 
-            // Act
-            String result = dto.toString();
+        assertThat(violations).isNotEmpty();
+        assertThat(violations).anyMatch(v -> v.getMessage().contains(expectedMessage));
+    }
 
-            // Assert
-            assertTrue(result.contains("audio-1"));
-            assertTrue(result.contains("mp4a.40.2"));
-            assertTrue(result.contains("130482"));
-            assertTrue(result.contains("44100"));
-            assertTrue(result.contains("2"));
-            assertTrue(result.contains("en"));
-            assertTrue(result.contains("English"));
-        }
+    // ── from() ───────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Maps every field from a fully-populated AudioStream, including both segment ranges")
+    void mapsAllFieldsFromValidStream() {
+        AudioStream stream = audioStream(Locale.ENGLISH, 2);
+        when(stream.getFormat().getName()).thenReturn("M4A");
+        when(stream.getInitStart()).thenReturn(0);
+        when(stream.getInitEnd()).thenReturn(722);
+        when(stream.getIndexStart()).thenReturn(723);
+        when(stream.getIndexEnd()).thenReturn(898);
+
+        AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.from(stream, 1);
+
+        assertThat(dto.getId()).isEqualTo("audio-1");
+        assertThat(dto.getUrl()).isEqualTo("https://example.com/audio.mp4");
+        assertThat(dto.getBandwidth()).isEqualTo(130482);
+        assertThat(dto.getAudioSamplingRate()).isEqualTo("44100");
+        assertThat(dto.getLanguage()).isEqualTo("en");
+        assertThat(dto.getLanguageName()).isEqualTo("English");
+        assertThat(dto.getInitRange()).isEqualTo("0-722");
+        assertThat(dto.getIndexRange()).isEqualTo("723-898");
+        assertThat(dto.getFormat()).isEqualTo("M4A");
+    }
+
+    @Test
+    @DisplayName("Rejects a null AudioStream with IllegalArgumentException")
+    void rejectsNullAudioStream() {
+        assertThatThrownBy(() -> AudioStreamMetadataDTO.from(null, 1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("AudioStream cannot be null");
+    }
+
+    static Stream<Arguments> localeCases() {
+        return Stream.of(
+                Arguments.of("null locale", null, "und", "Unknown"),
+                Arguments.of("Spanish", Locale.forLanguageTag("es"), "es", "Spanish"),
+                Arguments.of("French", Locale.FRENCH, "fr", "French"),
+                Arguments.of("German", Locale.GERMAN, "de", "German"));
+    }
+
+    @ParameterizedTest(name = "Resolves {0} to language/name")
+    @MethodSource("localeCases")
+    @DisplayName("Resolves language and languageName from the stream's audio locale, defaulting to und/Unknown")
+    void resolvesLanguageFromLocale(String name, Locale locale, String expectedLanguage, String expectedName) {
+        AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.from(audioStream(locale, 2), 1);
+
+        assertThat(dto.getLanguage()).isEqualTo(expectedLanguage);
+        assertThat(dto.getLanguageName()).isEqualTo(expectedName);
+    }
+
+    @Test
+    @DisplayName("Defaults mimeType to audio/mp4 and format to null when the stream's format is null")
+    void handlesNullFormat() {
+        AudioStream stream = mock(AudioStream.class);
+        ItagItem itagItem = mock(ItagItem.class);
+        when(stream.getContent()).thenReturn("https://example.com/audio.mp4");
+        when(stream.getCodec()).thenReturn("mp4a.40.2");
+        when(stream.getFormat()).thenReturn(null);
+        when(stream.getBitrate()).thenReturn(130482);
+        when(stream.getItagItem()).thenReturn(itagItem);
+        when(itagItem.getSampleRate()).thenReturn(44100);
+        when(itagItem.getAudioChannels()).thenReturn(2);
+        when(stream.getInitStart()).thenReturn(-1);
+        when(stream.getIndexStart()).thenReturn(-1);
+
+        AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.from(stream, 1);
+
+        assertThat(dto.getMimeType()).isEqualTo("audio/mp4");
+        assertThat(dto.getFormat()).isNull();
+    }
+
+    @Test
+    @DisplayName("Defaults audioChannels to 2 when the itag reports zero")
+    void defaultsAudioChannelsWhenItagReportsZero() {
+        AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.from(audioStream(null, 0), 1);
+
+        assertThat(dto.getAudioChannels()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Omits both segment ranges when the stream reports no start offsets")
+    void omitsRangesWhenNotAvailable() {
+        AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.from(audioStream(null, 2), 1);
+
+        assertThat(dto.getInitRange()).isNull();
+        assertThat(dto.getIndexRange()).isNull();
+    }
+
+    // ── JSON ─────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Omits unset optional fields from the serialized JSON")
+    void omitsNullFieldsInJson() throws Exception {
+        AudioStreamMetadataDTO dto = AudioStreamMetadataDTO.builder()
+                .id("audio-1").url("https://example.com/audio.mp4").codec("mp4a.40.2")
+                .mimeType("audio/mp4").bandwidth(130482).audioSamplingRate("44100").audioChannels(2)
+                .build();
+
+        String json = objectMapper.writeValueAsString(dto);
+
+        assertThat(json).doesNotContain("\"language\"", "\"languageName\"", "\"initRange\"", "\"format\"");
+    }
+
+    @Test
+    @DisplayName("Round-trips every field through serialize/deserialize unchanged")
+    void roundTripPreservesAllFields() throws Exception {
+        AudioStreamMetadataDTO original = validBuilder()
+                .initRange("0-722").indexRange("723-898").format("M4A").build();
+
+        AudioStreamMetadataDTO restored = objectMapper.readValue(
+                objectMapper.writeValueAsString(original), AudioStreamMetadataDTO.class);
+
+        assertThat(restored.getId()).isEqualTo(original.getId());
+        assertThat(restored.getUrl()).isEqualTo(original.getUrl());
+        assertThat(restored.getCodec()).isEqualTo(original.getCodec());
+        assertThat(restored.getMimeType()).isEqualTo(original.getMimeType());
+        assertThat(restored.getBandwidth()).isEqualTo(original.getBandwidth());
+        assertThat(restored.getAudioSamplingRate()).isEqualTo(original.getAudioSamplingRate());
+        assertThat(restored.getAudioChannels()).isEqualTo(original.getAudioChannels());
+        assertThat(restored.getLanguage()).isEqualTo(original.getLanguage());
+        assertThat(restored.getLanguageName()).isEqualTo(original.getLanguageName());
+        assertThat(restored.getInitRange()).isEqualTo(original.getInitRange());
+        assertThat(restored.getIndexRange()).isEqualTo(original.getIndexRange());
+        assertThat(restored.getFormat()).isEqualTo(original.getFormat());
+    }
+
+    // ── toString ─────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("toString includes the key identifying fields")
+    void toStringIncludesKeyFields() {
+        String result = validBuilder().build().toString();
+
+        assertThat(result).contains("audio-1", "mp4a.40.2", "130482", "en", "English");
     }
 }
