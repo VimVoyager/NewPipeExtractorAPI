@@ -11,11 +11,6 @@ import java.util.List;
 /**
  * API representation of a kiosk (e.g. "trending_gaming", "live") and its
  * initial page of streams.
- *
- * <p>NOTE: if a shared stream-item DTO already exists (e.g. the one used by
- * {@code ChannelTabDTO}), replace {@link KioskStreamItemDTO} with it so the
- * frontend gets one consistent item shape across channel tabs, search and
- * kiosks.</p>
  */
 public record KioskDTO(
         int serviceId,
