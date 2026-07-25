@@ -5,443 +5,244 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.schabi.newpipe.extractor.Image;
 import org.schabi.newpipe.extractor.InfoItem;
-import org.schabi.newpipe.extractor.stream.*;
+import org.schabi.newpipe.extractor.stream.AudioStream;
+import org.schabi.newpipe.extractor.stream.Description;
+import org.schabi.newpipe.extractor.stream.Frameset;
+import org.schabi.newpipe.extractor.stream.StreamInfo;
+import org.schabi.newpipe.extractor.stream.StreamSegment;
+import org.schabi.newpipe.extractor.stream.SubtitlesStream;
+import org.schabi.newpipe.extractor.stream.VideoStream;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.when;
 
 /**
- * Comprehensive test suite for VideoStreamingService.
- * Tests all stream extraction methods and error handling.
+ * Unit tests for VideoStreamingService.
  */
 @DisplayName("VideoStreamingService Tests")
 class VideoStreamingServiceTest {
 
-    private VideoStreamingService videoStreamingService;
     private static final String TEST_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+
+    private VideoStreamingService service;
 
     @BeforeEach
     void setUp() {
-        videoStreamingService = new VideoStreamingService();
+        service = new VideoStreamingService();
     }
+
+    /** A call to one of the service's accessor methods. */
+    @FunctionalInterface
+    interface ServiceCall {
+        Object apply(VideoStreamingService service) throws ExtractionException;
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    /**
+     * StreamInfo mock with explicit stream lists and duration — the three
+     * inputs to the retry decision.
+     */
+    private static StreamInfo streamInfo(List<VideoStream> videoOnly,
+                                         List<AudioStream> audio,
+                                         long duration) {
+        StreamInfo info = mock(StreamInfo.class);
+        when(info.getVideoOnlyStreams()).thenReturn(videoOnly);
+        when(info.getAudioStreams()).thenReturn(audio);
+        when(info.getVideoStreams()).thenReturn(Collections.emptyList());
+        when(info.getDuration()).thenReturn(duration);
+        return info;
+    }
+
+    private static StreamInfo completeStreamInfo() {
+        return streamInfo(List.of(mock(VideoStream.class)), List.of(mock(AudioStream.class)), 120L);
+    }
+
+    /** No adaptive streams but a valid duration — the retry trigger. */
+    private static StreamInfo incompleteStreamInfo() {
+        return streamInfo(Collections.emptyList(), Collections.emptyList(), 120L);
+    }
+
+    // ── Retry logic (the actual business logic in this class) ────────────
 
     @Nested
-    @DisplayName("Stream Info Tests")
-    class StreamInfoTests {
+    @DisplayName("getStreamInfo retry logic")
+    class RetryLogicTests {
 
         @Test
-        @DisplayName("Should return stream info successfully")
-        void testGetStreamInfo_Success() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
+        @DisplayName("Returns first result when adaptive streams are present")
+        void returnsFirstResult_whenAdaptiveStreamsPresent() throws Exception {
+            StreamInfo complete = completeStreamInfo();
 
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+            try (MockedStatic<StreamInfo> extractor = mockStatic(StreamInfo.class)) {
+                extractor.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(complete);
 
-                // Act
-                StreamInfo result = videoStreamingService.getStreamInfo(TEST_URL);
+                StreamInfo result = service.getStreamInfo(TEST_URL);
 
-                // Assert
-                assertNotNull(result);
-                assertEquals("Test Video", result.getName());
+                assertThat(result).isSameAs(complete);
+                extractor.verify(() -> StreamInfo.getInfo(TEST_URL), times(1));
             }
         }
 
         @Test
-        @DisplayName("Should throw ExtractionException when extraction fails")
-        void testGetStreamInfo_ThrowsExtractionException() {
-            // Arrange
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL))
-                        .thenThrow(new RuntimeException("Extraction failed"));
+        @DisplayName("Retries once when response is incomplete but valid, returning the retry result")
+        void retriesOnce_whenResponseIncompleteButValid() throws Exception {
+            StreamInfo incomplete = incompleteStreamInfo();
+            StreamInfo complete = completeStreamInfo();
 
-                // Act & Assert
-                ExtractionException exception = assertThrows(ExtractionException.class, () ->
-                        videoStreamingService.getStreamInfo(TEST_URL)
-                );
+            try (MockedStatic<StreamInfo> extractor = mockStatic(StreamInfo.class)) {
+                extractor.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(incomplete, complete);
 
-                assertTrue(exception.getMessage().contains("Extraction failed"));
-                assertNotNull(exception.getCause());
-            }
-        }
-    }
+                StreamInfo result = service.getStreamInfo(TEST_URL);
 
-    @Nested
-    @DisplayName("Audio Stream Tests")
-    class AudioStreamTests {
-
-        @Test
-        @DisplayName("Should return audio streams successfully")
-        void testGetAudioStreams_Success() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            List<AudioStream> mockAudioStreams = createMockAudioStreams();
-            when(mockStreamInfo.getAudioStreams()).thenReturn(mockAudioStreams);
-
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                List<AudioStream> result = videoStreamingService.getAudioStreams(TEST_URL);
-
-                // Assert
-                assertNotNull(result);
-                assertEquals(2, result.size());
+                assertThat(result).isSameAs(complete);
+                extractor.verify(() -> StreamInfo.getInfo(TEST_URL), times(2));
             }
         }
 
         @Test
-        @DisplayName("Should return empty list when no audio streams available")
-        void testGetAudioStreams_EmptyList() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            when(mockStreamInfo.getAudioStreams()).thenReturn(Collections.emptyList());
+        @DisplayName("Gives up after one retry, returning the second result even if still incomplete")
+        void returnsSecondResult_whenRetryAlsoIncomplete() throws Exception {
+            StreamInfo firstIncomplete = incompleteStreamInfo();
+            StreamInfo secondIncomplete = incompleteStreamInfo();
 
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
+            try (MockedStatic<StreamInfo> extractor = mockStatic(StreamInfo.class)) {
+                extractor.when(() -> StreamInfo.getInfo(TEST_URL))
+                        .thenReturn(firstIncomplete, secondIncomplete);
 
-                // Act
-                List<AudioStream> result = videoStreamingService.getAudioStreams(TEST_URL);
+                StreamInfo result = service.getStreamInfo(TEST_URL);
 
-                // Assert
-                assertNotNull(result);
-                assertTrue(result.isEmpty());
+                assertThat(result).isSameAs(secondIncomplete);
+                extractor.verify(() -> StreamInfo.getInfo(TEST_URL), times(2));
             }
         }
 
         @Test
-        @DisplayName("Should throw ExtractionException when extraction fails")
-        void testGetAudioStreams_ThrowsExtractionException() {
-            // Arrange
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL))
-                        .thenThrow(new RuntimeException("Failed"));
+        @DisplayName("Does not retry when duration is invalid (zero)")
+        void doesNotRetry_whenDurationInvalid() throws Exception {
+            StreamInfo invalid = streamInfo(Collections.emptyList(), Collections.emptyList(), 0L);
 
-                // Act & Assert
-                ExtractionException exception = assertThrows(ExtractionException.class, () ->
-                        videoStreamingService.getAudioStreams(TEST_URL)
-                );
+            try (MockedStatic<StreamInfo> extractor = mockStatic(StreamInfo.class)) {
+                extractor.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(invalid);
 
-                assertTrue(exception.getMessage().contains("Failed"));
-            }
-        }
-    }
+                StreamInfo result = service.getStreamInfo(TEST_URL);
 
-    @Nested
-    @DisplayName("Video Stream Tests")
-    class VideoStreamTests {
-
-        @Test
-        @DisplayName("Should return video streams successfully")
-        void testGetVideoStreams_Success() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            List<VideoStream> mockVideoStreams = createMockVideoStreams();
-            when(mockStreamInfo.getVideoOnlyStreams()).thenReturn(mockVideoStreams);
-
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                List<VideoStream> result = videoStreamingService.getVideoStreams(TEST_URL);
-
-                // Assert
-                assertNotNull(result);
-                assertEquals(2, result.size());
+                assertThat(result).isSameAs(invalid);
+                extractor.verify(() -> StreamInfo.getInfo(TEST_URL), times(1));
             }
         }
 
         @Test
-        @DisplayName("Should throw ExtractionException when extraction fails")
-        void testGetVideoStreams_ThrowsExtractionException() {
-            // Arrange
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL))
-                        .thenThrow(new RuntimeException("Failed"));
+        @DisplayName("Wraps extraction failures in ExtractionException preserving message and cause")
+        void wrapsFailure_inExtractionException() {
+            RuntimeException boom = new RuntimeException("Video unavailable");
 
-                // Act & Assert
-                ExtractionException exception = assertThrows(ExtractionException.class, () ->
-                        videoStreamingService.getVideoStreams(TEST_URL)
-                );
+            try (MockedStatic<StreamInfo> extractor = mockStatic(StreamInfo.class)) {
+                extractor.when(() -> StreamInfo.getInfo(TEST_URL)).thenThrow(boom);
 
-                assertTrue(exception.getMessage().contains("Failed"));
+                assertThatThrownBy(() -> service.getStreamInfo(TEST_URL))
+                        .isInstanceOf(ExtractionException.class)
+                        .hasMessage("Video unavailable")
+                        .hasCause(boom);
             }
         }
     }
 
-    @Nested
-    @DisplayName("DASH MPD Tests")
-    class DashMpdTests {
+    // ── Accessor delegation ──────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should return DASH MPD URL successfully")
-        void testGetDashMpdUrl_Success() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            String dashUrl = "https://youtube.com/dash/manifest.mpd";
-            when(mockStreamInfo.getDashMpdUrl()).thenReturn(dashUrl);
+    static Stream<Arguments> accessors() {
+        List<AudioStream> audio = List.of(mock(AudioStream.class), mock(AudioStream.class));
+        List<VideoStream> video = List.of(mock(VideoStream.class), mock(VideoStream.class));
+        String dashUrl = "https://youtube.com/dash/manifest.mpd";
+        List<Image> thumbnails = List.of(mock(Image.class));
+        List<SubtitlesStream> subtitles = List.of(mock(SubtitlesStream.class));
+        List<StreamSegment> segments = List.of(mock(StreamSegment.class));
+        List<Frameset> frames = List.of(mock(Frameset.class));
+        Description description = mock(Description.class);
+        List<InfoItem> related = List.of(mock(InfoItem.class), mock(InfoItem.class));
 
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                String result = videoStreamingService.getDashMpdUrl(TEST_URL);
-
-                // Assert
-                assertEquals(dashUrl, result);
-            }
-        }
-
-        @Test
-        @DisplayName("Should handle null DASH MPD URL")
-        void testGetDashMpdUrl_Null() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            when(mockStreamInfo.getDashMpdUrl()).thenReturn(null);
-
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                String result = videoStreamingService.getDashMpdUrl(TEST_URL);
-
-                // Assert
-                assertNull(result);
-            }
-        }
-    }
-
-    @Nested
-    @DisplayName("Thumbnail tests")
-    class thumbnailTests {
-
-        @Test
-        @DisplayName("Should return stream thumbnail images successfully")
-        void testGetStreamThumbnails_Success() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            List<Image> mockThumbnails = createMockThumbnails();
-            when(mockStreamInfo.getThumbnails()).thenReturn(mockThumbnails);
-
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                List<Image> result = videoStreamingService.getStreamThumbnails(TEST_URL);
-
-                // Assert
-                assertNotNull(result);
-                assertEquals(1, result.size());
-            }
-
-
-        }
-    }
-
-    @Nested
-    @DisplayName("Subtitle Tests")
-    class SubtitleTests {
-
-        @Test
-        @DisplayName("Should return subtitle streams successfully")
-        void testGetSubtitleStreams_Success() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            List<SubtitlesStream> mockSubtitles = createMockSubtitles();
-            when(mockStreamInfo.getSubtitles()).thenReturn(mockSubtitles);
-
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                List<SubtitlesStream> result = videoStreamingService.getSubtitleStreams(TEST_URL);
-
-                // Assert
-                assertNotNull(result);
-                assertEquals(2, result.size());
-            }
-        }
-    }
-
-    @Nested
-    @DisplayName("Stream Segment Tests")
-    class StreamSegmentTests {
-
-        @Test
-        @DisplayName("Should return stream segments successfully")
-        void testGetStreamSegments_Success() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            List<StreamSegment> mockSegments = createMockSegments();
-            when(mockStreamInfo.getStreamSegments()).thenReturn(mockSegments);
-
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                List<StreamSegment> result = videoStreamingService.getStreamSegments(TEST_URL);
-
-                // Assert
-                assertNotNull(result);
-                assertEquals(3, result.size());
-            }
-        }
-    }
-
-    @Nested
-    @DisplayName("Preview Frame Tests")
-    class PreviewFrameTests {
-
-        @Test
-        @DisplayName("Should return preview frames successfully")
-        void testGetPreviewFrames_Success() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            List<Frameset> mockFrames = createMockFramesets();
-            when(mockStreamInfo.getPreviewFrames()).thenReturn(mockFrames);
-
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                List<Frameset> result = videoStreamingService.getPreviewFrames(TEST_URL);
-
-                // Assert
-                assertNotNull(result);
-                assertEquals(1, result.size());
-            }
-        }
-    }
-
-    @Nested
-    @DisplayName("Description Tests")
-    class DescriptionTests {
-
-        @Test
-        @DisplayName("Should return description successfully")
-        void testGetStreamDescription_Success() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            Description mockDescription = createMockDescription();
-            when(mockStreamInfo.getDescription()).thenReturn(mockDescription);
-
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                Description result = videoStreamingService.getStreamDescription(TEST_URL);
-
-                // Assert
-                assertNotNull(result);
-            }
-        }
-    }
-
-    @Nested
-    @DisplayName("Related Streams Tests")
-    class RelatedStreamsTests {
-
-        @Test
-        @DisplayName("Should return related streams successfully")
-        void testGetRelatedStreams_Success() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            List<InfoItem> mockRelated = createMockRelatedItems();
-            when(mockStreamInfo.getRelatedItems()).thenReturn(mockRelated);
-
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                List<InfoItem> result = videoStreamingService.getRelatedStreams(TEST_URL);
-
-                // Assert
-                assertNotNull(result);
-                assertEquals(5, result.size());
-            }
-        }
-
-        @Test
-        @DisplayName("Should return empty list when no related streams")
-        void testGetRelatedStreams_EmptyList() throws Exception {
-            // Arrange
-            StreamInfo mockStreamInfo = createMockStreamInfo();
-            when(mockStreamInfo.getRelatedItems()).thenReturn(Collections.emptyList());
-
-            try (MockedStatic<StreamInfo> streamInfoMock = mockStatic(StreamInfo.class)) {
-                streamInfoMock.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(mockStreamInfo);
-
-                // Act
-                List<InfoItem> result = videoStreamingService.getRelatedStreams(TEST_URL);
-
-                // Assert
-                assertNotNull(result);
-                assertTrue(result.isEmpty());
-            }
-        }
-    }
-
-    // Helper methods to create mock objects
-    private StreamInfo createMockStreamInfo() {
-        StreamInfo mockInfo = mock(StreamInfo.class);
-        when(mockInfo.getName()).thenReturn("Test Video");
-        when(mockInfo.getUrl()).thenReturn(TEST_URL);
-        return mockInfo;
-    }
-
-    private List<AudioStream> createMockAudioStreams() {
-        AudioStream stream1 = mock(AudioStream.class);
-        AudioStream stream2 = mock(AudioStream.class);
-        return Arrays.asList(stream1, stream2);
-    }
-
-    private List<VideoStream> createMockVideoStreams() {
-        VideoStream stream1 = mock(VideoStream.class);
-        VideoStream stream2 = mock(VideoStream.class);
-        return Arrays.asList(stream1, stream2);
-    }
-
-    private List<SubtitlesStream> createMockSubtitles() {
-        SubtitlesStream sub1 = mock(SubtitlesStream.class);
-        SubtitlesStream sub2 = mock(SubtitlesStream.class);
-        return Arrays.asList(sub1, sub2);
-    }
-
-    private List<Image> createMockThumbnails() {
-        Image thumbnail = mock(Image.class);
-        return Collections.singletonList(thumbnail);
-    }
-
-    private List<StreamSegment> createMockSegments() {
-        StreamSegment seg1 = mock(StreamSegment.class);
-        StreamSegment seg2 = mock(StreamSegment.class);
-        StreamSegment seg3 = mock(StreamSegment.class);
-        return Arrays.asList(seg1, seg2, seg3);
-    }
-
-    private List<Frameset> createMockFramesets() {
-        Frameset frameset = mock(Frameset.class);
-        return Collections.singletonList(frameset);
-    }
-
-    private Description createMockDescription() {
-        return mock(Description.class);
-    }
-
-    private List<InfoItem> createMockRelatedItems() {
-        return Arrays.asList(
-                mock(InfoItem.class),
-                mock(InfoItem.class),
-                mock(InfoItem.class),
-                mock(InfoItem.class),
-                mock(InfoItem.class)
+        return Stream.of(
+                accessor("getAudioStreams",
+                        info -> when(info.getAudioStreams()).thenReturn(audio),
+                        s -> s.getAudioStreams(TEST_URL), audio),
+                accessor("getVideoStreams",
+                        info -> when(info.getVideoOnlyStreams()).thenReturn(video),
+                        s -> s.getVideoStreams(TEST_URL), video),
+                accessor("getDashMpdUrl",
+                        info -> when(info.getDashMpdUrl()).thenReturn(dashUrl),
+                        s -> s.getDashMpdUrl(TEST_URL), dashUrl),
+                accessor("getStreamThumbnails",
+                        info -> when(info.getThumbnails()).thenReturn(thumbnails),
+                        s -> s.getStreamThumbnails(TEST_URL), thumbnails),
+                accessor("getSubtitleStreams",
+                        info -> when(info.getSubtitles()).thenReturn(subtitles),
+                        s -> s.getSubtitleStreams(TEST_URL), subtitles),
+                accessor("getStreamSegments",
+                        info -> when(info.getStreamSegments()).thenReturn(segments),
+                        s -> s.getStreamSegments(TEST_URL), segments),
+                accessor("getPreviewFrames",
+                        info -> when(info.getPreviewFrames()).thenReturn(frames),
+                        s -> s.getPreviewFrames(TEST_URL), frames),
+                accessor("getStreamDescription",
+                        info -> when(info.getDescription()).thenReturn(description),
+                        s -> s.getStreamDescription(TEST_URL), description),
+                accessor("getRelatedStreams",
+                        info -> when(info.getRelatedItems()).thenReturn(related),
+                        s -> s.getRelatedStreams(TEST_URL), related)
         );
+    }
+
+    private static Arguments accessor(String name, Consumer<StreamInfo> stub,
+                                      ServiceCall call, Object expected) {
+        return Arguments.of(name, stub, call, expected);
+    }
+
+    @ParameterizedTest(name = "{0} returns the value from StreamInfo")
+    @MethodSource("accessors")
+    @DisplayName("Accessors delegate to the corresponding StreamInfo getter")
+    void accessor_delegatesToStreamInfo(String name, Consumer<StreamInfo> stub,
+                                        ServiceCall call, Object expected) throws Exception {
+        // Complete info so the retry path stays inert; the stub then wires
+        // the sentinel into the getter this accessor is supposed to read.
+        StreamInfo info = completeStreamInfo();
+        stub.accept(info);
+
+        try (MockedStatic<StreamInfo> extractor = mockStatic(StreamInfo.class)) {
+            extractor.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(info);
+
+            assertThat(call.apply(service)).isSameAs(expected);
+        }
+    }
+
+    @ParameterizedTest(name = "{0} wraps failures in ExtractionException")
+    @MethodSource("accessors")
+    @DisplayName("Accessors wrap extraction failures in ExtractionException")
+    void accessor_wrapsExtractionFailure(String name, Consumer<StreamInfo> stub,
+                                         ServiceCall call, Object expected) {
+        RuntimeException boom = new RuntimeException("Extraction failed");
+
+        try (MockedStatic<StreamInfo> extractor = mockStatic(StreamInfo.class)) {
+            extractor.when(() -> StreamInfo.getInfo(TEST_URL)).thenThrow(boom);
+
+            assertThatThrownBy(() -> call.apply(service))
+                    .isInstanceOf(ExtractionException.class)
+                    .hasMessage("Extraction failed")
+                    .hasCause(boom);
+        }
     }
 }

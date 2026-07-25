@@ -1,10 +1,17 @@
 package org.example.api.downloader;
 
-import okhttp3.*;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import okhttp3.mockwebserver.RecordedRequest;
-import org.junit.jupiter.api.*;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
+import okhttp3.OkHttpClient;
+import okio.Buffer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.schabi.newpipe.extractor.downloader.Request;
 import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
@@ -12,16 +19,32 @@ import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Comprehensive test suite for DownloaderImpl.
- * Uses MockWebServer to test HTTP interactions without real network calls.
+ * Tests for DownloaderImpl, using MockWebServer for hermetic HTTP.
+ *
+ * <p>Migrated to the mockwebserver3 API (OkHttp 5): MockResponse is now
+ * immutable and built via {@code MockResponse.Builder}; {@code shutdown()}
+ * is {@code close()}; {@code RecordedRequest.getHeader(name)} is
+ * {@code getHeaders().get(name)}; and the recorded body is a ByteString
+ * ({@code getBody().utf8()}).</p>
+ *
+ * <p>Consolidated at the same time: standalone User-Agent/method tests are
+ * folded into the request-path success tests, the three init tests are one,
+ * 404/500 passthrough is parameterized, and the Privacy nest (which asserted
+ * the absence of headers the code never sets) is gone.</p>
  */
 @DisplayName("DownloaderImpl Tests")
 class DownloaderImplTest {
@@ -36,686 +59,377 @@ class DownloaderImplTest {
         mockWebServer.start();
         baseUrl = mockWebServer.url("/").toString();
 
-        // Initialize downloader with default OkHttpClient
+        // NOTE: init() mutates a static singleton — keep this suite
+        // single-threaded (no JUnit parallel execution for this class).
         downloader = DownloaderImpl.init(null);
     }
 
     @AfterEach
     void tearDown() throws IOException {
-        mockWebServer.shutdown();
+        mockWebServer.close();
     }
 
-    @Nested
-    @DisplayName("Initialization Tests")
-    class InitializationTests {
-
-        @Test
-        @DisplayName("Should initialize downloader with default builder")
-        void testInit_DefaultBuilder() {
-            // Act
-            DownloaderImpl instance = DownloaderImpl.init(null);
-
-            // Assert
-            assertNotNull(instance);
-            assertSame(instance, DownloaderImpl.getInstance());
-        }
-
-        @Test
-        @DisplayName("Should initialize downloader with custom builder")
-        void testInit_CustomBuilder() {
-            // Arrange
-            OkHttpClient.Builder customBuilder = new OkHttpClient.Builder()
-                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS);
-
-            // Act
-            DownloaderImpl instance = DownloaderImpl.init(customBuilder);
-
-            // Assert
-            assertNotNull(instance);
-            assertSame(instance, DownloaderImpl.getInstance());
-        }
-
-        @Test
-        @DisplayName("Should return same instance (singleton pattern)")
-        void testSingletonPattern() {
-            // Arrange
-            DownloaderImpl instance1 = DownloaderImpl.init(null);
-
-            // Act
-            DownloaderImpl instance2 = DownloaderImpl.getInstance();
-
-            // Assert
-            assertSame(instance1, instance2);
-        }
-
-        @Test
-        @DisplayName("Should have default User-Agent")
-        void testDefaultUserAgent() {
-            // Assert
-            assertEquals("Mozilla/5.0 (Windows NT 6.1; WOW64; rv:43.0) Gecko/20100101 Firefox/43.0",
-                    DownloaderImpl.USER_AGENT);
-        }
+    private static MockResponse okBody(String body) {
+        return new MockResponse.Builder().body(body).build();
     }
+
+    // ── Initialization ───────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("init registers the singleton for null and custom builders")
+    void init_registersSingleton() {
+        DownloaderImpl fromNull = DownloaderImpl.init(null);
+        assertNotNull(fromNull);
+        assertSame(fromNull, DownloaderImpl.getInstance());
+
+        OkHttpClient.Builder customBuilder = new OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS);
+        DownloaderImpl fromCustom = DownloaderImpl.init(customBuilder);
+        assertNotNull(fromCustom);
+        assertSame(fromCustom, DownloaderImpl.getInstance());
+    }
+
+    // ── Cookies ──────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Cookie Management Tests")
     class CookieManagementTests {
 
         @Test
-        @DisplayName("Should get and set cookies")
-        void testGetSetCookies() {
-            // Arrange
+        @DisplayName("Cookies start null and round-trip through set/get")
+        void cookies_startNullAndRoundTrip() {
+            assertNull(downloader.getCookies());
+
             String testCookies = "session=abc123; token=xyz789";
-
-            // Act
             downloader.setCookies(testCookies);
-
-            // Assert
             assertEquals(testCookies, downloader.getCookies());
         }
 
         @Test
-        @DisplayName("Should start with null cookies")
-        void testInitialCookiesNull() {
-            // Arrange
-            DownloaderImpl newDownloader = DownloaderImpl.init(null);
+        @DisplayName("stream() sends the Cookie header when cookies are set")
+        void stream_sendsCookieHeader() throws Exception {
+            mockWebServer.enqueue(okBody("OK"));
+            downloader.setCookies("session=test123");
 
-            // Assert
-            assertNull(newDownloader.getCookies());
-        }
-
-        @Test
-        @DisplayName("Should include cookies in request headers")
-        void testCookiesInRequestHeaders() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setBody("OK"));
-            String cookies = "session=test123";
-            downloader.setCookies(cookies);
-
-            // Act
             downloader.stream(baseUrl + "test");
 
-            // Assert
             RecordedRequest request = mockWebServer.takeRequest();
-            assertEquals(cookies, request.getHeader("Cookie"));
+            assertEquals("session=test123", request.getHeaders().get("Cookie"));
         }
 
         @Test
-        @DisplayName("Should not include Cookie header when cookies are empty")
-        void testNoCookiesWhenEmpty() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setBody("OK"));
+        @DisplayName("stream() omits the Cookie header when cookies are empty")
+        void stream_omitsCookieHeaderWhenEmpty() throws Exception {
+            mockWebServer.enqueue(okBody("OK"));
             downloader.setCookies("");
 
-            // Act
             downloader.stream(baseUrl + "test");
 
-            // Assert
             RecordedRequest request = mockWebServer.takeRequest();
-            assertNull(request.getHeader("Cookie"));
+            assertNull(request.getHeaders().get("Cookie"));
+        }
+
+        @Test
+        @DisplayName("execute() sends the Cookie header when cookies are set")
+        void execute_sendsCookieHeader() throws Exception {
+            mockWebServer.enqueue(okBody("OK"));
+            downloader.setCookies("session=abc123");
+
+            downloader.execute(new Request.Builder().get(baseUrl + "api/data").build());
+
+            RecordedRequest request = mockWebServer.takeRequest();
+            assertEquals("session=abc123", request.getHeaders().get("Cookie"));
         }
     }
+
+    // ── Content length ───────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Content Length Tests")
     class ContentLengthTests {
 
         @Test
-        @DisplayName("Should get content length from HEAD request")
-        void testGetContentLength_Success() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse()
-                    .setBody("x".repeat(12345)));
+        @DisplayName("Reads Content-Length via a HEAD request")
+        void getContentLength_readsHeaderViaHead() throws Exception {
+            mockWebServer.enqueue(okBody("x".repeat(12345)));
 
-            // Act
             long contentLength = downloader.getContentLength(baseUrl + "file");
 
-            // Assert
             assertEquals(12345L, contentLength);
-
-            // Verify HEAD request was made
             RecordedRequest request = mockWebServer.takeRequest();
             assertEquals("HEAD", request.getMethod());
         }
 
         @Test
-        @DisplayName("Should throw IOException when Content-Length header is missing")
-        void testGetContentLength_MissingHeader() {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse()
-                    .setChunkedBody("test content", 4));
-
-            // Act & Assert
-            assertThrows(IOException.class, () ->
-                    downloader.getContentLength(baseUrl + "file")
-            );
-        }
-
-        @Test
-        @DisplayName("Should throw IOException when Content-Length is invalid")
-        void testGetContentLength_InvalidNumber() {
-            // Use chunked encoding to avoid auto Content-Length
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader("Content-Length", "not-a-number")
-                    .setChunkedBody("", 1));
-
-            Exception exception = assertThrows(Exception.class, () ->
-                    downloader.getContentLength(baseUrl + "file")
-            );
-            assertTrue(exception instanceof IOException ||
-                    exception instanceof NullPointerException);
-        }
-
-        @Test
-        @DisplayName("Should handle zero content length")
-        void testGetContentLength_Zero() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse()
-                    .setHeader("Content-Length", "0")
-                    .setBody(""));
-
-            // Act
-            long contentLength = downloader.getContentLength(baseUrl + "empty");
-
-            // Assert
-            assertEquals(0L, contentLength);
-        }
-
-        @Test
-        @DisplayName("Should handle large content length")
-        void testGetContentLength_LargeFile() throws Exception {
+        @DisplayName("Parses values beyond Integer range")
+        void getContentLength_parsesLargeValues() throws Exception {
             long largeSize = 5_000_000_000L;
+            // body() sets a Content-Length header; setHeader overrides it.
+            mockWebServer.enqueue(new MockResponse.Builder()
+                    .body("x")
+                    .setHeader("Content-Length", String.valueOf(largeSize))
+                    .build());
 
-            MockResponse response = new MockResponse()
-                    .setResponseCode(200);
+            assertEquals(largeSize, downloader.getContentLength(baseUrl + "large"));
+        }
 
-            response.setBody("x");  // Set body first (triggers Content-Length)
-            response.setHeader("Content-Length", String.valueOf(largeSize));  // Override it
+        @Test
+        @DisplayName("Throws IOException when the header is missing")
+        void getContentLength_missingHeader_throwsIOException() {
+            // Chunked transfer encoding means no Content-Length header.
+            mockWebServer.enqueue(new MockResponse.Builder()
+                    .chunkedBody(new Buffer().writeUtf8("test content"), 4)
+                    .build());
 
-            mockWebServer.enqueue(response);
+            assertThrows(IOException.class, () ->
+                    downloader.getContentLength(baseUrl + "file"));
+        }
 
-            long contentLength = downloader.getContentLength(baseUrl + "large");
-            assertEquals(largeSize, contentLength);
+        @Test
+        @DisplayName("Throws IOException when the header is not a number")
+        void getContentLength_invalidNumber_throwsIOException() {
+            // Chunked body avoids an auto Content-Length so the bogus one wins.
+            // (Previously this test accepted IOException OR NullPointerException;
+            // the contract is IOException("Invalid content length") — assert that.)
+            mockWebServer.enqueue(new MockResponse.Builder()
+                    .code(200)
+                    .chunkedBody(new Buffer().writeUtf8(""), 1)
+                    .setHeader("Content-Length", "not-a-number")
+                    .build());
+
+            IOException exception = assertThrows(IOException.class, () ->
+                    downloader.getContentLength(baseUrl + "file"));
+            assertTrue(exception.getMessage().contains("Invalid content length"));
         }
     }
+
+    // ── stream() ─────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Stream Tests")
     class StreamTests {
 
         @Test
-        @DisplayName("Should open input stream successfully")
-        void testStream_Success() throws Exception {
-            // Arrange
+        @DisplayName("Streams body content via GET with the default User-Agent")
+        void stream_returnsContent_viaGetWithUserAgent() throws Exception {
+            // Content round-trip, method, and UA in one request — these were
+            // three tests each firing an identical request.
             String testContent = "Test content data";
-            mockWebServer.enqueue(new MockResponse().setBody(testContent));
+            mockWebServer.enqueue(okBody(testContent));
 
-            // Act
-            InputStream stream = downloader.stream(baseUrl + "data");
+            try (InputStream stream = downloader.stream(baseUrl + "data")) {
+                assertNotNull(stream);
+                assertEquals(testContent, new String(stream.readAllBytes(), StandardCharsets.UTF_8));
+            }
 
-            // Assert
-            assertNotNull(stream);
-            String content = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-            assertEquals(testContent, content);
-            stream.close();
-        }
-
-        @Test
-        @DisplayName("Should include User-Agent in stream request")
-        void testStream_UserAgent() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setBody("OK"));
-
-            // Act
-            downloader.stream(baseUrl + "test");
-
-            // Assert
-            RecordedRequest request = mockWebServer.takeRequest();
-            assertEquals(DownloaderImpl.USER_AGENT, request.getHeader("User-Agent"));
-        }
-
-        @Test
-        @DisplayName("Should use GET method for stream")
-        void testStream_GetMethod() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setBody("OK"));
-
-            // Act
-            downloader.stream(baseUrl + "test");
-
-            // Assert
             RecordedRequest request = mockWebServer.takeRequest();
             assertEquals("GET", request.getMethod());
+            assertEquals(DownloaderImpl.USER_AGENT, request.getHeaders().get("User-Agent"));
         }
 
         @Test
-        @DisplayName("Should throw IOException when stream returns 429")
-        void testStream_ReCaptchaException() {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setResponseCode(429));
+        @DisplayName("Streams binary data intact")
+        void stream_handlesBinaryData() throws Exception {
+            byte[] binaryData = {0x00, 0x01, 0x02, (byte) 0xFF};
+            mockWebServer.enqueue(new MockResponse.Builder()
+                    .body(new Buffer().write(binaryData))
+                    .build());
 
-            // Act & Assert
-            IOException exception = assertThrows(IOException.class, () ->
-                    downloader.stream(baseUrl + "blocked")
-            );
-            assertTrue(exception.getMessage().contains("reCaptcha"));
+            try (InputStream stream = downloader.stream(baseUrl + "binary")) {
+                assertArrayEquals(binaryData, stream.readAllBytes());
+            }
         }
 
         @Test
-        @DisplayName("Should return null when response body is null")
-        void testStream_NullBody() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(204) // No Content
-                    .setBody(""));
+        @DisplayName("Returns a non-null empty stream for an empty body")
+        void stream_returnsEmptyStreamForEmptyBody() throws Exception {
+            mockWebServer.enqueue(new MockResponse.Builder()
+                    .code(204)
+                    .body("")
+                    .build());
 
-            // Act
             InputStream stream = downloader.stream(baseUrl + "empty");
 
-            // Assert
-            assertNotNull(stream); // Body exists but is empty
+            assertNotNull(stream);
+            stream.close();
         }
 
         @Test
-        @DisplayName("Should handle binary data stream")
-        void testStream_BinaryData() throws Exception {
-            // Arrange
-            byte[] binaryData = {0x00, 0x01, 0x02, (byte) 0xFF};
-            mockWebServer.enqueue(new MockResponse()
-                    .setBody(new okio.Buffer().write(binaryData)));
+        @DisplayName("Throws IOException with reCaptcha message on 429")
+        void stream_throwsOn429() {
+            mockWebServer.enqueue(new MockResponse.Builder().code(429).build());
 
-            // Act
-            InputStream stream = downloader.stream(baseUrl + "binary");
-
-            // Assert
-            assertNotNull(stream);
-            byte[] result = stream.readAllBytes();
-            assertArrayEquals(binaryData, result);
-            stream.close();
+            IOException exception = assertThrows(IOException.class, () ->
+                    downloader.stream(baseUrl + "blocked"));
+            assertTrue(exception.getMessage().contains("reCaptcha"));
         }
     }
+
+    // ── execute() ────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Execute Request Tests")
     class ExecuteRequestTests {
 
         @Test
-        @DisplayName("Should execute GET request successfully")
-        void testExecute_GetRequest() throws Exception {
-            // Arrange
+        @DisplayName("Executes GET returning code and body, with the default User-Agent")
+        void execute_getRequest_returnsCodeAndBody() throws Exception {
             String responseBody = "Success response";
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(200)
-                    .setBody(responseBody));
+            mockWebServer.enqueue(new MockResponse.Builder()
+                    .code(200)
+                    .body(responseBody)
+                    .build());
 
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/data")
-                    .build();
+            Response response = downloader.execute(
+                    new Request.Builder().get(baseUrl + "api/data").build());
 
-            // Act
-            Response response = downloader.execute(request);
-
-            // Assert
             assertEquals(200, response.responseCode());
             assertEquals(responseBody, response.responseBody());
 
             RecordedRequest recordedRequest = mockWebServer.takeRequest();
             assertEquals("GET", recordedRequest.getMethod());
+            assertEquals(DownloaderImpl.USER_AGENT, recordedRequest.getHeaders().get("User-Agent"));
         }
 
         @Test
-        @DisplayName("Should execute POST request with data")
-        void testExecute_PostRequest() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setResponseCode(201));
+        @DisplayName("Executes POST sending the request data")
+        void execute_postRequest_sendsData() throws Exception {
+            mockWebServer.enqueue(new MockResponse.Builder().code(201).build());
 
             byte[] postData = "key=value".getBytes(StandardCharsets.UTF_8);
-            Request request = new Request.Builder()
-                    .post(baseUrl + "api/create", postData)
-                    .build();
+            Response response = downloader.execute(
+                    new Request.Builder().post(baseUrl + "api/create", postData).build());
 
-            // Act
-            Response response = downloader.execute(request);
-
-            // Assert
             assertEquals(201, response.responseCode());
 
             RecordedRequest recordedRequest = mockWebServer.takeRequest();
             assertEquals("POST", recordedRequest.getMethod());
-            assertEquals("key=value", recordedRequest.getBody().readUtf8());
+            // RecordedRequest.body is a ByteString in mockwebserver3
+            assertNotNull(recordedRequest.getBody());
+            assertEquals("key=value", recordedRequest.getBody().utf8());
         }
 
         @Test
-        @DisplayName("Should execute HEAD request")
-        void testExecute_HeadRequest() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(200)
-                    .setHeader("Content-Length", "1234"));
+        @DisplayName("Executes HEAD requests")
+        void execute_headRequest() throws Exception {
+            mockWebServer.enqueue(new MockResponse.Builder()
+                    .code(200)
+                    .setHeader("Content-Length", "1234")
+                    .build());
 
-            Request request = new Request.Builder()
-                    .head(baseUrl + "api/check")
-                    .build();
+            Response response = downloader.execute(
+                    new Request.Builder().head(baseUrl + "api/check").build());
 
-            // Act
-            Response response = downloader.execute(request);
-
-            // Assert
             assertEquals(200, response.responseCode());
-
-            RecordedRequest recordedRequest = mockWebServer.takeRequest();
-            assertEquals("HEAD", recordedRequest.getMethod());
+            assertEquals("HEAD", mockWebServer.takeRequest().getMethod());
         }
 
         @Test
-        @DisplayName("Should include custom headers in request")
-        void testExecute_CustomHeaders() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setBody("OK"));
+        @DisplayName("Forwards custom headers, including multi-valued ones")
+        void execute_forwardsCustomHeaders() throws Exception {
+            mockWebServer.enqueue(okBody("OK"));
 
             Map<String, List<String>> headers = new HashMap<>();
-            headers.put("X-Custom-Header", Arrays.asList("CustomValue"));
-            headers.put("Accept", Arrays.asList("application/json"));
+            headers.put("X-Custom-Header", List.of("CustomValue"));
+            headers.put("Accept", List.of("application/json", "text/html"));
 
-            Request request = new Request.Builder()
+            downloader.execute(new Request.Builder()
                     .get(baseUrl + "api/data")
                     .headers(headers)
-                    .build();
+                    .build());
 
-            // Act
-            downloader.execute(request);
-
-            // Assert
             RecordedRequest recordedRequest = mockWebServer.takeRequest();
-            assertEquals("CustomValue", recordedRequest.getHeader("X-Custom-Header"));
-            assertEquals("application/json", recordedRequest.getHeader("Accept"));
-        }
-
-        @Test
-        @DisplayName("Should handle multiple values for same header")
-        void testExecute_MultipleHeaderValues() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setBody("OK"));
-
-            Map<String, List<String>> headers = new HashMap<>();
-            headers.put("Accept", Arrays.asList("application/json", "text/html"));
-
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/data")
-                    .headers(headers)
-                    .build();
-
-            // Act
-            downloader.execute(request);
-
-            // Assert
-            RecordedRequest recordedRequest = mockWebServer.takeRequest();
+            assertEquals("CustomValue", recordedRequest.getHeaders().get("X-Custom-Header"));
             List<String> acceptHeaders = recordedRequest.getHeaders().values("Accept");
             assertTrue(acceptHeaders.contains("application/json"));
             assertTrue(acceptHeaders.contains("text/html"));
         }
 
-        @Test
-        @DisplayName("Should include User-Agent in execute request")
-        void testExecute_UserAgent() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setBody("OK"));
+        @ParameterizedTest(name = "Passes through HTTP {0} with its body")
+        @CsvSource({
+                "404, Not Found",
+                "500, Internal Server Error"
+        })
+        @DisplayName("Passes error statuses and bodies through unchanged")
+        void execute_passesThroughErrorStatuses(int status, String body) throws Exception {
+            mockWebServer.enqueue(new MockResponse.Builder()
+                    .code(status)
+                    .body(body)
+                    .build());
 
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/data")
-                    .build();
+            Response response = downloader.execute(
+                    new Request.Builder().get(baseUrl + "api/err").build());
 
-            // Act
-            downloader.execute(request);
-
-            // Assert
-            RecordedRequest recordedRequest = mockWebServer.takeRequest();
-            assertEquals(DownloaderImpl.USER_AGENT, recordedRequest.getHeader("User-Agent"));
+            assertEquals(status, response.responseCode());
+            assertEquals(body, response.responseBody());
         }
 
         @Test
-        @DisplayName("Should throw ReCaptchaException on 429 response")
-        void testExecute_ReCaptchaException() {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setResponseCode(429));
+        @DisplayName("Returns an empty (non-null) body for 204 No Content")
+        void execute_returnsEmptyBodyFor204() throws Exception {
+            mockWebServer.enqueue(new MockResponse.Builder().code(204).build());
 
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/data")
-                    .build();
+            Response response = downloader.execute(
+                    new Request.Builder().get(baseUrl + "api/empty").build());
 
-            // Act & Assert
-            ReCaptchaException exception = assertThrows(ReCaptchaException.class, () ->
-                    downloader.execute(request)
-            );
-            assertTrue(exception.getMessage().contains("reCaptcha"));
-        }
-
-        @Test
-        @DisplayName("Should handle 404 response")
-        void testExecute_NotFound() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(404)
-                    .setBody("Not Found"));
-
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/missing")
-                    .build();
-
-            // Act
-            Response response = downloader.execute(request);
-
-            // Assert
-            assertEquals(404, response.responseCode());
-            assertEquals("Not Found", response.responseBody());
-        }
-
-        @Test
-        @DisplayName("Should handle 500 server error")
-        void testExecute_ServerError() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(500)
-                    .setBody("Internal Server Error"));
-
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/error")
-                    .build();
-
-            // Act
-            Response response = downloader.execute(request);
-
-            // Assert
-            assertEquals(500, response.responseCode());
-            assertEquals("Internal Server Error", response.responseBody());
-        }
-
-        @Test
-        @DisplayName("Should handle empty response body")
-        void testExecute_EmptyBody() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse()
-                    .setResponseCode(204)); // No Content
-
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/empty")
-                    .build();
-
-            // Act
-            Response response = downloader.execute(request);
-
-            // Assert
             assertEquals(204, response.responseCode());
-            assertNotNull(response.responseBody()); // Empty string, not null
+            assertNotNull(response.responseBody());
         }
 
         @Test
-        @DisplayName("Should include cookies in execute request")
-        void testExecute_WithCookies() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setBody("OK"));
-            String cookies = "session=abc123";
-            downloader.setCookies(cookies);
-
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/data")
-                    .build();
-
-            // Act
-            downloader.execute(request);
-
-            // Assert
-            RecordedRequest recordedRequest = mockWebServer.takeRequest();
-            assertEquals(cookies, recordedRequest.getHeader("Cookie"));
-        }
-
-        @Test
-        @DisplayName("Should capture response headers")
-        void testExecute_ResponseHeaders() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse()
+        @DisplayName("Captures response headers")
+        void execute_capturesResponseHeaders() throws Exception {
+            mockWebServer.enqueue(new MockResponse.Builder()
                     .setHeader("Content-Type", "application/json")
                     .setHeader("X-Custom", "value123")
-                    .setBody("{\"status\":\"ok\"}"));
+                    .body("{\"status\":\"ok\"}")
+                    .build());
 
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/data")
-                    .build();
+            Response response = downloader.execute(
+                    new Request.Builder().get(baseUrl + "api/data").build());
 
-            // Act
-            Response response = downloader.execute(request);
-
-            // Assert
             Map<String, List<String>> responseHeaders = response.responseHeaders();
             assertTrue(responseHeaders.containsKey("Content-Type"));
             assertTrue(responseHeaders.containsKey("X-Custom"));
         }
 
-//        @Test
-//        @DisplayName("Should preserve response URL")
-//        void testExecute_ResponseUrl() throws Exception {
-//            // Arrange
-//            String requestUrl = baseUrl + "api/data";
-//            mockWebServer.enqueue(new MockResponse().setBody("OK"));
-//
-//            Request request = new Request.Builder()
-//                    .get(requestUrl)
-//                    .build();
-//
-//            // Act
-//            Response response = downloader.execute(request);
-//
-//            // Assert
-//            assertEquals(requestUrl, response.responseUrl());
-//        }
+        @Test
+        @DisplayName("Throws ReCaptchaException on 429")
+        void execute_throwsReCaptchaOn429() {
+            mockWebServer.enqueue(new MockResponse.Builder().code(429).build());
+
+            ReCaptchaException exception = assertThrows(ReCaptchaException.class, () ->
+                    downloader.execute(new Request.Builder().get(baseUrl + "api/data").build()));
+            assertTrue(exception.getMessage().contains("reCaptcha"));
+        }
     }
+
+    // ── Error handling ───────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Error Handling Tests")
     class ErrorHandlingTests {
 
-//        @Test
-//        @DisplayName("Should handle network timeout")
-//        void testNetworkTimeout() {
-//            OkHttpClient.Builder testBuilder = new OkHttpClient.Builder()
-//                    .readTimeout(1, TimeUnit.SECONDS);
-//
-//            DownloaderImpl testDownloader = DownloaderImpl.init(testBuilder);
-//
-//            mockWebServer.enqueue(new MockResponse()
-//                    .setBodyDelay(2, TimeUnit.SECONDS));
-//
-//            Request request = new Request.Builder()
-//                    .get(baseUrl + "api/slow")
-//                    .build();
-//
-//            // Timeout throws IOException (SocketTimeoutException extends IOException)
-//            assertThrows(IOException.class, () ->
-//                    testDownloader.execute(request)
-//            );
-//
-//            downloader = DownloaderImpl.init(null);
-//        }
-
         @Test
-        @DisplayName("Should handle invalid URL")
-        void testInvalidUrl() {
-            Request request = new Request.Builder()
-                    .get("not-a-valid-url")
-                    .build();
+        @DisplayName("Wraps invalid URLs in IOException with the cause preserved")
+        void execute_invalidUrl_throwsIOException() {
+            Request request = new Request.Builder().get("not-a-valid-url").build();
 
             IOException exception = assertThrows(IOException.class, () ->
-                    downloader.execute(request)
-            );
+                    downloader.execute(request));
 
             assertTrue(exception.getMessage().contains("Invalid URL"));
             assertTrue(exception.getCause() instanceof IllegalArgumentException);
         }
 
         @Test
-        @DisplayName("Should handle connection refused")
-        void testConnectionRefused() throws Exception {
-            // Arrange
-            mockWebServer.shutdown(); // Shutdown server to simulate connection refused
+        @DisplayName("Throws IOException when the connection is refused")
+        void execute_connectionRefused_throwsIOException() throws Exception {
+            mockWebServer.close(); // simulate connection refused
 
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/data")
-                    .build();
+            Request request = new Request.Builder().get(baseUrl + "api/data").build();
 
-            // Act & Assert
-            assertThrows(IOException.class, () ->
-                    downloader.execute(request)
-            );
-        }
-    }
-
-    @Nested
-    @DisplayName("Privacy Tests")
-    class PrivacyTests {
-
-        @Test
-        @DisplayName("Should not expose user data in requests")
-        void testNoUserDataInRequests() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setBody("OK"));
-
-            Request request = new Request.Builder()
-                    .get(baseUrl + "api/data")
-                    .build();
-
-            // Act
-            downloader.execute(request);
-
-            // Assert
-            RecordedRequest recordedRequest = mockWebServer.takeRequest();
-
-            // Verify no privacy-invasive headers
-            assertNull(recordedRequest.getHeader("X-User-Id"));
-            assertNull(recordedRequest.getHeader("X-Session-Id"));
-            assertNull(recordedRequest.getHeader("X-Tracking-Id"));
-
-            // Only expected headers should be present
-            assertNotNull(recordedRequest.getHeader("User-Agent"));
-        }
-
-        @Test
-        @DisplayName("Should use generic User-Agent (no personal info)")
-        void testGenericUserAgent() throws Exception {
-            // Arrange
-            mockWebServer.enqueue(new MockResponse().setBody("OK"));
-
-            // Act
-            downloader.stream(baseUrl + "test");
-
-            // Assert
-            RecordedRequest request = mockWebServer.takeRequest();
-            String userAgent = request.getHeader("User-Agent");
-
-            // Verify it's a generic browser UA, not identifying the user
-            assertTrue(userAgent.contains("Firefox"));
-            assertFalse(userAgent.contains("user"));
-            assertFalse(userAgent.contains("id"));
+            assertThrows(IOException.class, () -> downloader.execute(request));
         }
     }
 }

@@ -17,10 +17,10 @@ public class PlaylistService {
 
     public PlaylistInfo getPlaylistInfo(String url) throws Exception {
         try {
-            logger.info("Extracting audio streams for URL {}:", url);
+            logger.info("Extracting playlist info for URL {}:", url);
             return PlaylistInfo.getInfo(url);
         } catch (Exception e) {
-            logger.error("Failed to extract audio streams for URL {}:", url, e);
+            logger.error("Failed to extract playlist info for URL {}:", url, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }
@@ -29,10 +29,10 @@ public class PlaylistService {
         try {
             StreamingService service = NewPipe.getServiceByUrl(url);
             Page pageInstance = new Page(pageUrl);
-            logger.error("Failed to extract audio streams for URL {}:", url);
+            logger.error("Failed to extract playlist page for URL {}:", url);
             return PlaylistInfo.getMoreItems(service, url, pageInstance);
         } catch (Exception e) {
-            logger.error("Failed to extract audio streams for URL {}:", url, e);
+            logger.error("Failed to extract playlist page for URL {}:", url, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }

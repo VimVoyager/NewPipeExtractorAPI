@@ -1,32 +1,36 @@
 package org.example.api.dto.dash;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.schabi.newpipe.extractor.stream.StreamInfo;
-import org.schabi.newpipe.extractor.stream.VideoStream;
-import org.schabi.newpipe.extractor.stream.AudioStream;
-import org.schabi.newpipe.extractor.stream.SubtitlesStream;
-import org.schabi.newpipe.extractor.MediaFormat;
-import org.schabi.newpipe.extractor.services.youtube.ItagItem;
-
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.schabi.newpipe.extractor.MediaFormat;
+import org.schabi.newpipe.extractor.services.youtube.ItagItem;
+import org.schabi.newpipe.extractor.stream.AudioStream;
+import org.schabi.newpipe.extractor.stream.StreamInfo;
+import org.schabi.newpipe.extractor.stream.SubtitlesStream;
+import org.schabi.newpipe.extractor.stream.VideoStream;
+
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
- * Test suite for DashManifestConfigDTO.
- * Tests validation, factory methods, builder pattern, and JSON serialization.
+ * Unit tests for DashManifestConfigDTO.
  */
 @DisplayName("DashManifestConfigDTO Tests")
 class DashManifestConfigDTOTest {
@@ -36,580 +40,301 @@ class DashManifestConfigDTOTest {
 
     @BeforeEach
     void setUp() {
-        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
-        validator = factory.getValidator();
+        validator = Validation.buildDefaultValidatorFactory().getValidator();
         objectMapper = new ObjectMapper();
     }
 
-    @Nested
-    @DisplayName("Builder Pattern Tests")
-    class BuilderTests {
+    // ── Helpers ──────────────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should build DTO with all fields")
-        void testBuilder_AllFields() {
-            // Arrange
-            List<VideoStreamMetadataDTO> videoStreams = Arrays.asList(
-                    VideoStreamMetadataDTO.builder()
-                            .id("video-1")
-                            .url("https://example.com/video.mp4")
-                            .codec("avc1.640028")
-                            .mimeType("video/mp4")
-                            .width(1920)
-                            .height(1080)
-                            .frameRate("24")
-                            .bandwidth(3423702)
-                            .build()
-            );
-
-            List<AudioStreamMetadataDTO> audioStreams = Arrays.asList(
-                    AudioStreamMetadataDTO.builder()
-                            .id("audio-1")
-                            .url("https://example.com/audio.mp4")
-                            .codec("mp4a.40.2")
-                            .mimeType("audio/mp4")
-                            .bandwidth(130482)
-                            .audioSamplingRate("44100")
-                            .audioChannels(2)
-                            .build()
-            );
-
-            List<SubtitleMetadataDTO> subtitleStreams = Arrays.asList(
-                    SubtitleMetadataDTO.builder()
-                            .id("subtitle-1")
-                            .url("https://example.com/subtitle.vtt")
-                            .language("en")
-                            .mimeType("text/vtt")
-                            .build()
-            );
-
-            // Act
-            DashManifestConfigDTO dto = DashManifestConfigDTO.builder()
-                    .type("static")
-                    .mediaPresentationDuration("PT1M59.702S")
-                    .minBufferTime("PT2S")
-                    .profiles("urn:mpeg:dash:profile:isoff-on-demand:2011")
-                    .videoStreams(videoStreams)
-                    .audioStreams(audioStreams)
-                    .subtitleStreams(subtitleStreams)
-                    .durationSeconds(120)
-                    .build();
-
-            // Assert
-            assertEquals("static", dto.getType());
-            assertEquals("PT1M59.702S", dto.getMediaPresentationDuration());
-            assertEquals("PT2S", dto.getMinBufferTime());
-            assertEquals("urn:mpeg:dash:profile:isoff-on-demand:2011", dto.getProfiles());
-            assertEquals(1, dto.getVideoStreams().size());
-            assertEquals(1, dto.getAudioStreams().size());
-            assertEquals(1, dto.getSubtitleStreams().size());
-            assertEquals(120, dto.getDurationSeconds());
-        }
-
-        @Test
-        @DisplayName("Should use default values in default constructor")
-        void testDefaultConstructor() {
-            // Act
-            DashManifestConfigDTO dto = new DashManifestConfigDTO();
-
-            // Assert
-            assertEquals("static", dto.getType());
-            assertEquals("PT2S", dto.getMinBufferTime());
-            assertEquals("urn:mpeg:dash:profile:isoff-on-demand:2011", dto.getProfiles());
-            assertNotNull(dto.getVideoStreams());
-            assertNotNull(dto.getAudioStreams());
-            assertNotNull(dto.getSubtitleStreams());
-            assertTrue(dto.getVideoStreams().isEmpty());
-            assertTrue(dto.getAudioStreams().isEmpty());
-            assertTrue(dto.getSubtitleStreams().isEmpty());
-        }
-
-        @Test
-        @DisplayName("Should handle null stream lists in constructor")
-        void testConstructor_NullStreamLists() {
-            // Act
-            DashManifestConfigDTO dto = new DashManifestConfigDTO(
-                    "static",
-                    "PT1M59S",
-                    "PT2S",
-                    "urn:mpeg:dash:profile:isoff-on-demand:2011",
-                    null,
-                    null,
-                    null,
-                    119
-            );
-
-            // Assert
-            assertNotNull(dto.getVideoStreams());
-            assertNotNull(dto.getAudioStreams());
-            assertNotNull(dto.getSubtitleStreams());
-            assertTrue(dto.getVideoStreams().isEmpty());
-        }
+    private static DashManifestConfigDTO.Builder validBuilder() {
+        return DashManifestConfigDTO.builder()
+                .type("static")
+                .mediaPresentationDuration("PT1M59S")
+                .minBufferTime("PT2S")
+                .profiles("urn:mpeg:dash:profile:isoff-on-demand:2011")
+                .videoStreams(new ArrayList<>())
+                .audioStreams(new ArrayList<>())
+                .subtitleStreams(new ArrayList<>())
+                .durationSeconds(119);
     }
 
-    @Nested
-    @DisplayName("Validation Tests")
-    class ValidationTests {
-
-        @Test
-        @DisplayName("Should pass validation for valid DTO")
-        void testValidation_ValidDto() {
-            // Arrange
-            DashManifestConfigDTO dto = DashManifestConfigDTO.builder()
-                    .type("static")
-                    .mediaPresentationDuration("PT1M59S")
-                    .minBufferTime("PT2S")
-                    .profiles("urn:mpeg:dash:profile:isoff-on-demand:2011")
-                    .videoStreams(new ArrayList<>())
-                    .audioStreams(new ArrayList<>())
-                    .subtitleStreams(new ArrayList<>())
-                    .durationSeconds(119)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<DashManifestConfigDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertTrue(violations.isEmpty(), "Valid DTO should have no violations");
-        }
-
-        @Test
-        @DisplayName("Should fail validation when type is blank")
-        void testValidation_BlankType() {
-            // Arrange
-            DashManifestConfigDTO dto = DashManifestConfigDTO.builder()
-                    .type("")
-                    .mediaPresentationDuration("PT1M59S")
-                    .minBufferTime("PT2S")
-                    .profiles("urn:mpeg:dash:profile:isoff-on-demand:2011")
-                    .videoStreams(new ArrayList<>())
-                    .audioStreams(new ArrayList<>())
-                    .subtitleStreams(new ArrayList<>())
-                    .durationSeconds(119)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<DashManifestConfigDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Manifest type cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when mediaPresentationDuration is blank")
-        void testValidation_BlankMediaPresentationDuration() {
-            // Arrange
-            DashManifestConfigDTO dto = DashManifestConfigDTO.builder()
-                    .type("static")
-                    .mediaPresentationDuration("")
-                    .minBufferTime("PT2S")
-                    .profiles("urn:mpeg:dash:profile:isoff-on-demand:2011")
-                    .videoStreams(new ArrayList<>())
-                    .audioStreams(new ArrayList<>())
-                    .subtitleStreams(new ArrayList<>())
-                    .durationSeconds(119)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<DashManifestConfigDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Media presentation duration cannot be blank")));
-        }
-
-        @Test
-        @DisplayName("Should fail validation when durationSeconds is zero")
-        void testValidation_ZeroDuration() {
-            // Arrange
-            DashManifestConfigDTO dto = DashManifestConfigDTO.builder()
-                    .type("static")
-                    .mediaPresentationDuration("PT0S")
-                    .minBufferTime("PT2S")
-                    .profiles("urn:mpeg:dash:profile:isoff-on-demand:2011")
-                    .videoStreams(new ArrayList<>())
-                    .audioStreams(new ArrayList<>())
-                    .subtitleStreams(new ArrayList<>())
-                    .durationSeconds(0)
-                    .build();
-
-            // Act
-            Set<ConstraintViolation<DashManifestConfigDTO>> violations = validator.validate(dto);
-
-            // Assert
-            assertFalse(violations.isEmpty());
-            assertTrue(violations.stream()
-                    .anyMatch(v -> v.getMessage().contains("Duration must be at least 1 second")));
-        }
+    private VideoStream videoStream() {
+        VideoStream stream = mock(VideoStream.class);
+        MediaFormat format = mock(MediaFormat.class);
+        when(stream.getContent()).thenReturn("https://example.com/video.mp4");
+        when(stream.getCodec()).thenReturn("avc1.640028");
+        when(stream.getFormat()).thenReturn(format);
+        when(format.getMimeType()).thenReturn("video/mp4");
+        when(stream.getWidth()).thenReturn(1920);
+        when(stream.getHeight()).thenReturn(1080);
+        when(stream.getFps()).thenReturn(24);
+        when(stream.getBitrate()).thenReturn(3423702);
+        when(stream.getInitStart()).thenReturn(-1);
+        when(stream.getIndexStart()).thenReturn(-1);
+        return stream;
     }
 
-    @Nested
-    @DisplayName("Factory Method Tests")
-    class FactoryMethodTests {
-
-        @Test
-        @DisplayName("Should create DTO from StreamInfo")
-        void testFrom_ValidStreamInfo() {
-            // Arrange
-            StreamInfo streamInfo = mock(StreamInfo.class);
-            VideoStream videoStream = createMockVideoStream();
-            AudioStream audioStream = createMockAudioStream();
-            SubtitlesStream subtitleStream = createMockSubtitlesStream();
-
-            when(streamInfo.getDuration()).thenReturn(119L);
-            when(streamInfo.getVideoOnlyStreams()).thenReturn(Arrays.asList(videoStream));
-            when(streamInfo.getAudioStreams()).thenReturn(Arrays.asList(audioStream));
-            when(streamInfo.getSubtitles()).thenReturn(Arrays.asList(subtitleStream));
-
-            // Act
-            DashManifestConfigDTO dto = DashManifestConfigDTO.from(streamInfo);
-
-            // Assert
-            assertEquals("static", dto.getType());
-            assertEquals("PT2S", dto.getMinBufferTime());
-            assertEquals(119, dto.getDurationSeconds());
-            assertEquals("PT1M59S", dto.getMediaPresentationDuration());
-            assertEquals(1, dto.getVideoStreams().size());
-            assertEquals(1, dto.getAudioStreams().size());
-            assertEquals(1, dto.getSubtitleStreams().size());
-        }
-
-        @Test
-        @DisplayName("Should handle StreamInfo with empty streams")
-        void testFrom_EmptyStreams() {
-            // Arrange
-            StreamInfo streamInfo = mock(StreamInfo.class);
-
-            when(streamInfo.getDuration()).thenReturn(120L);
-            when(streamInfo.getVideoOnlyStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getAudioStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getSubtitles()).thenReturn(new ArrayList<>());
-
-            // Act
-            DashManifestConfigDTO dto = DashManifestConfigDTO.from(streamInfo);
-
-            // Assert
-            assertTrue(dto.getVideoStreams().isEmpty());
-            assertTrue(dto.getAudioStreams().isEmpty());
-            assertTrue(dto.getSubtitleStreams().isEmpty());
-        }
-
-        @Test
-        @DisplayName("Should throw exception when StreamInfo is null")
-        void testFrom_NullStreamInfo() {
-            // Act & Assert
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                    DashManifestConfigDTO.from(null)
-            );
-
-            assertTrue(exception.getMessage().contains("StreamInfo cannot be null"));
-        }
-
-        @Test
-        @DisplayName("Should handle multiple streams of each type")
-        void testFrom_MultipleStreams() {
-            // Arrange
-            StreamInfo streamInfo = mock(StreamInfo.class);
-            List<VideoStream> videoStreams = Arrays.asList(
-                    createMockVideoStream(),
-                    createMockVideoStream(),
-                    createMockVideoStream()
-            );
-            List<AudioStream> audioStreams = Arrays.asList(
-                    createMockAudioStream(),
-                    createMockAudioStream()
-            );
-            List<SubtitlesStream> subtitleStreams = Arrays.asList(
-                    createMockSubtitlesStream(),
-                    createMockSubtitlesStream(),
-                    createMockSubtitlesStream(),
-                    createMockSubtitlesStream()
-            );
-
-            when(streamInfo.getDuration()).thenReturn(180L);
-            when(streamInfo.getVideoOnlyStreams()).thenReturn(videoStreams);
-            when(streamInfo.getAudioStreams()).thenReturn(audioStreams);
-            when(streamInfo.getSubtitles()).thenReturn(subtitleStreams);
-
-            // Act
-            DashManifestConfigDTO dto = DashManifestConfigDTO.from(streamInfo);
-
-            // Assert
-            assertEquals(3, dto.getVideoStreams().size());
-            assertEquals(2, dto.getAudioStreams().size());
-            assertEquals(4, dto.getSubtitleStreams().size());
-        }
-
-        @Test
-        @DisplayName("Should skip invalid streams without failing")
-        void testFrom_InvalidStreamSkipped() {
-            // Arrange
-            StreamInfo streamInfo = mock(StreamInfo.class);
-            VideoStream invalidStream = mock(VideoStream.class);
-            VideoStream validStream = createMockVideoStream();
-
-            // Make first stream throw exception
-            when(invalidStream.getContent()).thenThrow(new RuntimeException("Invalid stream"));
-
-            when(streamInfo.getDuration()).thenReturn(120L);
-            when(streamInfo.getVideoOnlyStreams()).thenReturn(Arrays.asList(invalidStream, validStream));
-            when(streamInfo.getAudioStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getSubtitles()).thenReturn(new ArrayList<>());
-
-            // Act
-            DashManifestConfigDTO dto = DashManifestConfigDTO.from(streamInfo);
-
-            // Assert - should have skipped invalid stream
-            assertEquals(1, dto.getVideoStreams().size());
-        }
-
-        private VideoStream createMockVideoStream() {
-            VideoStream stream = mock(VideoStream.class);
-            MediaFormat format = mock(MediaFormat.class);
-
-            when(stream.getContent()).thenReturn("https://example.com/video.mp4");
-            when(stream.getCodec()).thenReturn("avc1.640028");
-            when(stream.getFormat()).thenReturn(format);
-            when(format.getMimeType()).thenReturn("video/mp4");
-            when(stream.getWidth()).thenReturn(1920);
-            when(stream.getHeight()).thenReturn(1080);
-            when(stream.getFps()).thenReturn(24);
-            when(stream.getBitrate()).thenReturn(3423702);
-            when(stream.getInitStart()).thenReturn(-1);
-            when(stream.getIndexStart()).thenReturn(-1);
-
-            return stream;
-        }
-
-        private AudioStream createMockAudioStream() {
-            AudioStream stream = mock(AudioStream.class);
-            MediaFormat format = mock(MediaFormat.class);
-            var itagItem = mock(ItagItem.class);
-
-            when(stream.getContent()).thenReturn("https://example.com/audio.mp4");
-            when(stream.getCodec()).thenReturn("mp4a.40.2");
-            when(stream.getFormat()).thenReturn(format);
-            when(format.getMimeType()).thenReturn("audio/mp4");
-            when(stream.getBitrate()).thenReturn(130482);
-            when(stream.getItagItem()).thenReturn(itagItem);
-            when(itagItem.getSampleRate()).thenReturn(44100);
-            when(itagItem.getAudioChannels()).thenReturn(2);
-            when(stream.getAudioLocale()).thenReturn(null);
-            when(stream.getInitStart()).thenReturn(-1);
-            when(stream.getIndexStart()).thenReturn(-1);
-
-            return stream;
-        }
-
-        private SubtitlesStream createMockSubtitlesStream() {
-            SubtitlesStream stream = mock(SubtitlesStream.class);
-
-            when(stream.getContent()).thenReturn("https://example.com/subtitle.vtt");
-            when(stream.getLocale()).thenReturn(java.util.Locale.ENGLISH);
-            when(stream.getDisplayLanguageName()).thenReturn("English");
-            when(stream.getFormat()).thenReturn(MediaFormat.VTT);
-            when(stream.isAutoGenerated()).thenReturn(false);
-
-            return stream;
-        }
+    private AudioStream audioStream() {
+        AudioStream stream = mock(AudioStream.class);
+        MediaFormat format = mock(MediaFormat.class);
+        ItagItem itagItem = mock(ItagItem.class);
+        when(stream.getContent()).thenReturn("https://example.com/audio.mp4");
+        when(stream.getCodec()).thenReturn("mp4a.40.2");
+        when(stream.getFormat()).thenReturn(format);
+        when(format.getMimeType()).thenReturn("audio/mp4");
+        when(stream.getBitrate()).thenReturn(130482);
+        when(stream.getItagItem()).thenReturn(itagItem);
+        when(itagItem.getSampleRate()).thenReturn(44100);
+        when(itagItem.getAudioChannels()).thenReturn(2);
+        when(stream.getInitStart()).thenReturn(-1);
+        when(stream.getIndexStart()).thenReturn(-1);
+        return stream;
     }
 
-    @Nested
-    @DisplayName("Duration Formatting Tests")
-    class DurationFormattingTests {
-
-        @Test
-        @DisplayName("Should format duration with hours, minutes, and seconds")
-        void testFormatDuration_FullFormat() {
-            // Arrange
-            StreamInfo streamInfo = mock(StreamInfo.class);
-            when(streamInfo.getDuration()).thenReturn(7385L); // 2h 3m 5s
-            when(streamInfo.getVideoOnlyStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getAudioStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getSubtitles()).thenReturn(new ArrayList<>());
-
-            // Act
-            DashManifestConfigDTO dto = DashManifestConfigDTO.from(streamInfo);
-
-            // Assert
-            assertEquals("PT2H3M5S", dto.getMediaPresentationDuration());
-        }
-
-        @Test
-        @DisplayName("Should format duration with only minutes and seconds")
-        void testFormatDuration_MinutesAndSeconds() {
-            // Arrange
-            StreamInfo streamInfo = mock(StreamInfo.class);
-            when(streamInfo.getDuration()).thenReturn(125L); // 2m 5s
-            when(streamInfo.getVideoOnlyStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getAudioStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getSubtitles()).thenReturn(new ArrayList<>());
-
-            // Act
-            DashManifestConfigDTO dto = DashManifestConfigDTO.from(streamInfo);
-
-            // Assert
-            assertEquals("PT2M5S", dto.getMediaPresentationDuration());
-        }
-
-        @Test
-        @DisplayName("Should format duration with only seconds")
-        void testFormatDuration_OnlySeconds() {
-            // Arrange
-            StreamInfo streamInfo = mock(StreamInfo.class);
-            when(streamInfo.getDuration()).thenReturn(45L);
-            when(streamInfo.getVideoOnlyStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getAudioStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getSubtitles()).thenReturn(new ArrayList<>());
-
-            // Act
-            DashManifestConfigDTO dto = DashManifestConfigDTO.from(streamInfo);
-
-            // Assert
-            assertEquals("PT45S", dto.getMediaPresentationDuration());
-        }
-
-        @Test
-        @DisplayName("Should format zero duration")
-        void testFormatDuration_Zero() {
-            // Arrange
-            StreamInfo streamInfo = mock(StreamInfo.class);
-            when(streamInfo.getDuration()).thenReturn(0L);
-            when(streamInfo.getVideoOnlyStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getAudioStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getSubtitles()).thenReturn(new ArrayList<>());
-
-            // Act
-            DashManifestConfigDTO dto = DashManifestConfigDTO.from(streamInfo);
-
-            // Assert
-            assertEquals("PT0S", dto.getMediaPresentationDuration());
-        }
-
-        @Test
-        @DisplayName("Should format duration with exact hour")
-        void testFormatDuration_ExactHour() {
-            // Arrange
-            StreamInfo streamInfo = mock(StreamInfo.class);
-            when(streamInfo.getDuration()).thenReturn(3600L); // 1 hour
-            when(streamInfo.getVideoOnlyStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getAudioStreams()).thenReturn(new ArrayList<>());
-            when(streamInfo.getSubtitles()).thenReturn(new ArrayList<>());
-
-            // Act
-            DashManifestConfigDTO dto = DashManifestConfigDTO.from(streamInfo);
-
-            // Assert
-            assertEquals("PT1H", dto.getMediaPresentationDuration());
-        }
+    private SubtitlesStream subtitlesStream() {
+        SubtitlesStream stream = mock(SubtitlesStream.class);
+        when(stream.getContent()).thenReturn("https://example.com/subtitle.vtt");
+        when(stream.getLocale()).thenReturn(java.util.Locale.ENGLISH);
+        when(stream.getDisplayLanguageName()).thenReturn("English");
+        when(stream.getFormat()).thenReturn(MediaFormat.VTT);
+        when(stream.isAutoGenerated()).thenReturn(false);
+        return stream;
     }
 
-    @Nested
-    @DisplayName("JSON Serialization Tests")
-    class JsonSerializationTests {
-
-        @Test
-        @DisplayName("Should serialize DTO to JSON")
-        void testSerialization() throws Exception {
-            // Arrange
-            DashManifestConfigDTO dto = DashManifestConfigDTO.builder()
-                    .type("static")
-                    .mediaPresentationDuration("PT1M59S")
-                    .minBufferTime("PT2S")
-                    .profiles("urn:mpeg:dash:profile:isoff-on-demand:2011")
-                    .videoStreams(new ArrayList<>())
-                    .audioStreams(new ArrayList<>())
-                    .subtitleStreams(new ArrayList<>())
-                    .durationSeconds(119)
-                    .build();
-
-            // Act
-            String json = objectMapper.writeValueAsString(dto);
-
-            // Assert
-            assertNotNull(json);
-            assertTrue(json.contains("\"type\":\"static\""));
-            assertTrue(json.contains("\"mediaPresentationDuration\":\"PT1M59S\""));
-            assertTrue(json.contains("\"durationSeconds\":119"));
-        }
-
-        @Test
-        @DisplayName("Should deserialize JSON to DTO")
-        void testDeserialization() throws Exception {
-            // Arrange
-            String json = "{\"type\":\"static\",\"mediaPresentationDuration\":\"PT1M59S\"," +
-                    "\"minBufferTime\":\"PT2S\"," +
-                    "\"profiles\":\"urn:mpeg:dash:profile:isoff-on-demand:2011\"," +
-                    "\"videoStreams\":[],\"audioStreams\":[],\"subtitleStreams\":[]," +
-                    "\"durationSeconds\":119}";
-
-            // Act
-            DashManifestConfigDTO dto = objectMapper.readValue(json, DashManifestConfigDTO.class);
-
-            // Assert
-            assertEquals("static", dto.getType());
-            assertEquals("PT1M59S", dto.getMediaPresentationDuration());
-            assertEquals(119, dto.getDurationSeconds());
-        }
-
-        @Test
-        @DisplayName("Should handle round-trip serialization")
-        void testRoundTripSerialization() throws Exception {
-            // Arrange
-            DashManifestConfigDTO original = DashManifestConfigDTO.builder()
-                    .type("static")
-                    .mediaPresentationDuration("PT1M59S")
-                    .minBufferTime("PT2S")
-                    .profiles("urn:mpeg:dash:profile:isoff-on-demand:2011")
-                    .videoStreams(new ArrayList<>())
-                    .audioStreams(new ArrayList<>())
-                    .subtitleStreams(new ArrayList<>())
-                    .durationSeconds(119)
-                    .build();
-
-            // Act
-            String json = objectMapper.writeValueAsString(original);
-            DashManifestConfigDTO deserialized = objectMapper.readValue(json, DashManifestConfigDTO.class);
-
-            // Assert
-            assertEquals(original.getType(), deserialized.getType());
-            assertEquals(original.getMediaPresentationDuration(), deserialized.getMediaPresentationDuration());
-            assertEquals(original.getDurationSeconds(), deserialized.getDurationSeconds());
-        }
+    private StreamInfo streamInfo(long duration, List<VideoStream> video,
+                                  List<AudioStream> audio, List<SubtitlesStream> subtitles) {
+        StreamInfo info = mock(StreamInfo.class);
+        when(info.getDuration()).thenReturn(duration);
+        when(info.getVideoOnlyStreams()).thenReturn(video);
+        when(info.getAudioStreams()).thenReturn(audio);
+        when(info.getSubtitles()).thenReturn(subtitles);
+        return info;
     }
 
-    @Nested
-    @DisplayName("ToString Tests")
-    class ToStringTests {
+    // ── Builder / constructors ───────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should produce readable toString output")
-        void testToString() {
-            // Arrange
-            DashManifestConfigDTO dto = DashManifestConfigDTO.builder()
-                    .type("static")
-                    .mediaPresentationDuration("PT1M59S")
-                    .minBufferTime("PT2S")
-                    .profiles("urn:mpeg:dash:profile:isoff-on-demand:2011")
-                    .videoStreams(new ArrayList<>())
-                    .audioStreams(new ArrayList<>())
-                    .subtitleStreams(new ArrayList<>())
-                    .durationSeconds(119)
-                    .build();
+    @Test
+    @DisplayName("Builder wires every field, including stream list sizes")
+    void builderWiresAllFields() {
+        DashManifestConfigDTO dto = validBuilder()
+                .videoStreams(List.of(VideoStreamMetadataDTO.builder().id("v").build()))
+                .audioStreams(List.of(AudioStreamMetadataDTO.builder().id("a").build()))
+                .subtitleStreams(List.of(SubtitleMetadataDTO.builder().id("s").build()))
+                .build();
 
-            // Act
-            String result = dto.toString();
+        assertThat(dto.getType()).isEqualTo("static");
+        assertThat(dto.getMediaPresentationDuration()).isEqualTo("PT1M59S");
+        assertThat(dto.getMinBufferTime()).isEqualTo("PT2S");
+        assertThat(dto.getProfiles()).isEqualTo("urn:mpeg:dash:profile:isoff-on-demand:2011");
+        assertThat(dto.getDurationSeconds()).isEqualTo(119);
+        assertThat(dto.getVideoStreams()).hasSize(1);
+        assertThat(dto.getAudioStreams()).hasSize(1);
+        assertThat(dto.getSubtitleStreams()).hasSize(1);
+    }
 
-            // Assert
-            assertTrue(result.contains("static"));
-            assertTrue(result.contains("PT1M59S"));
-            assertTrue(result.contains("119"));
-            assertTrue(result.contains("videoStreams=0"));
-            assertTrue(result.contains("audioStreams=0"));
-            assertTrue(result.contains("subtitleStreams=0"));
-        }
+    @Test
+    @DisplayName("The no-args constructor sets static/PT2S/on-demand-profile defaults with empty, non-null lists")
+    void defaultConstructorUsesSensibleDefaults() {
+        DashManifestConfigDTO dto = new DashManifestConfigDTO();
+
+        assertThat(dto.getType()).isEqualTo("static");
+        assertThat(dto.getMinBufferTime()).isEqualTo("PT2S");
+        assertThat(dto.getProfiles()).isEqualTo("urn:mpeg:dash:profile:isoff-on-demand:2011");
+        assertThat(dto.getVideoStreams()).isNotNull().isEmpty();
+        assertThat(dto.getAudioStreams()).isNotNull().isEmpty();
+        assertThat(dto.getSubtitleStreams()).isNotNull().isEmpty();
+    }
+
+    @Test
+    @DisplayName("The full constructor coalesces null stream lists to empty lists rather than storing null")
+    void fullConstructorCoalescesNullListsToEmpty() {
+        DashManifestConfigDTO dto = new DashManifestConfigDTO(
+                "static", "PT1M59S", "PT2S",
+                "urn:mpeg:dash:profile:isoff-on-demand:2011",
+                null, null, null, 119);
+
+        assertThat(dto.getVideoStreams()).isNotNull().isEmpty();
+        assertThat(dto.getAudioStreams()).isNotNull().isEmpty();
+        assertThat(dto.getSubtitleStreams()).isNotNull().isEmpty();
+    }
+
+    // ── Validation ───────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("A fully-populated DTO passes validation")
+    void validDtoPassesValidation() {
+        assertThat(validator.validate(validBuilder().build())).isEmpty();
+    }
+
+    static Stream<Arguments> invalidFieldCases() {
+        return Stream.of(
+                Arguments.of("blank type", (UnaryOperator<DashManifestConfigDTO.Builder>) b -> b.type(""),
+                        "Manifest type cannot be blank"),
+                Arguments.of("blank mediaPresentationDuration",
+                        (UnaryOperator<DashManifestConfigDTO.Builder>) b -> b.mediaPresentationDuration(""),
+                        "Media presentation duration cannot be blank"),
+                Arguments.of("zero durationSeconds",
+                        (UnaryOperator<DashManifestConfigDTO.Builder>) b -> b.durationSeconds(0),
+                        "Duration must be at least 1 second"));
+    }
+
+    @ParameterizedTest(name = "Rejects {0}")
+    @MethodSource("invalidFieldCases")
+    @DisplayName("Rejects DTOs violating a single constraint, with the matching message")
+    void rejectsInvalidField(String name, UnaryOperator<DashManifestConfigDTO.Builder> mutator,
+                             String expectedMessage) {
+        Set<ConstraintViolation<DashManifestConfigDTO>> violations =
+                validator.validate(mutator.apply(validBuilder()).build());
+
+        assertThat(violations).isNotEmpty();
+        assertThat(violations).anyMatch(v -> v.getMessage().contains(expectedMessage));
+    }
+
+    // ── from(StreamInfo) ─────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Maps duration and one stream of each type from a fully-populated StreamInfo")
+    void mapsAllStreamsFromStreamInfo() {
+        StreamInfo info = streamInfo(119L,
+                List.of(videoStream()), List.of(audioStream()), List.of(subtitlesStream()));
+
+        DashManifestConfigDTO dto = DashManifestConfigDTO.from(info);
+
+        assertThat(dto.getType()).isEqualTo("static");
+        assertThat(dto.getMinBufferTime()).isEqualTo("PT2S");
+        assertThat(dto.getDurationSeconds()).isEqualTo(119);
+        assertThat(dto.getMediaPresentationDuration()).isEqualTo("PT1M59S");
+        assertThat(dto.getVideoStreams()).hasSize(1);
+        assertThat(dto.getAudioStreams()).hasSize(1);
+        assertThat(dto.getSubtitleStreams()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Rejects a null StreamInfo with IllegalArgumentException")
+    void rejectsNullStreamInfo() {
+        assertThatThrownBy(() -> DashManifestConfigDTO.from(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("StreamInfo cannot be null");
+    }
+
+    @Test
+    @DisplayName("Maps a StreamInfo with no streams to three empty lists")
+    void mapsEmptyStreamsToEmptyLists() {
+        DashManifestConfigDTO dto = DashManifestConfigDTO.from(
+                streamInfo(120L, List.of(), List.of(), List.of()));
+
+        assertThat(dto.getVideoStreams()).isEmpty();
+        assertThat(dto.getAudioStreams()).isEmpty();
+        assertThat(dto.getSubtitleStreams()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Maps multiple streams of each type, preserving counts")
+    void mapsMultipleStreamsOfEachType() {
+        StreamInfo info = streamInfo(180L,
+                List.of(videoStream(), videoStream(), videoStream()),
+                List.of(audioStream(), audioStream()),
+                List.of(subtitlesStream(), subtitlesStream(), subtitlesStream(), subtitlesStream()));
+
+        DashManifestConfigDTO dto = DashManifestConfigDTO.from(info);
+
+        assertThat(dto.getVideoStreams()).hasSize(3);
+        assertThat(dto.getAudioStreams()).hasSize(2);
+        assertThat(dto.getSubtitleStreams()).hasSize(4);
+    }
+
+    @Test
+    @DisplayName("Skips a stream that throws during mapping, keeping the valid ones")
+    void skipsInvalidStreamsWithoutFailing() {
+        VideoStream invalid = mock(VideoStream.class);
+        when(invalid.getContent()).thenThrow(new RuntimeException("Invalid stream"));
+        StreamInfo info = streamInfo(120L, List.of(invalid, videoStream()), List.of(), List.of());
+
+        DashManifestConfigDTO dto = DashManifestConfigDTO.from(info);
+
+        assertThat(dto.getVideoStreams()).hasSize(1);
+    }
+
+    // ── fromWithSelectedStreams() — previously untested ───────────────────
+
+    @Test
+    @DisplayName("Maps duration and the SELECTED streams only (not the full StreamInfo lists)")
+    void fromWithSelectedStreams_mapsSelectedStreamsOnly() {
+        StreamInfo info = streamInfo(119L,
+                List.of(videoStream(), videoStream()), List.of(audioStream()), List.of(subtitlesStream()));
+
+        DashManifestConfigDTO dto = DashManifestConfigDTO.fromWithSelectedStreams(
+                info,
+                List.of(videoStream()), // one selected, though StreamInfo has two
+                List.of(audioStream()),
+                List.of(subtitlesStream()));
+
+        assertThat(dto.getType()).isEqualTo("static");
+        assertThat(dto.getDurationSeconds()).isEqualTo(119);
+        assertThat(dto.getMediaPresentationDuration()).isEqualTo("PT1M59S");
+        assertThat(dto.getVideoStreams()).hasSize(1);
+        assertThat(dto.getAudioStreams()).hasSize(1);
+        assertThat(dto.getSubtitleStreams()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Skips an invalid selected stream, keeping the valid ones (same contract as from())")
+    void fromWithSelectedStreams_skipsInvalidStreams() {
+        VideoStream invalid = mock(VideoStream.class);
+        when(invalid.getContent()).thenThrow(new RuntimeException("Invalid stream"));
+        StreamInfo info = streamInfo(120L, List.of(), List.of(), List.of());
+
+        DashManifestConfigDTO dto = DashManifestConfigDTO.fromWithSelectedStreams(
+                info, List.of(invalid, videoStream()), List.of(), List.of());
+
+        assertThat(dto.getVideoStreams()).hasSize(1);
+    }
+
+    // ── Duration formatting (via from()) ──────────────────────────────────
+
+    @ParameterizedTest(name = "{0}s -> {1}")
+    @CsvSource({
+            "7385, PT2H3M5S",   // hours + minutes + seconds
+            "125,  PT2M5S",     // minutes + seconds only
+            "45,   PT45S",      // seconds only
+            "0,    PT0S",       // zero
+            "3600, PT1H"        // exact hour, no trailing 0M0S
+    })
+    @DisplayName("Formats duration to ISO 8601, including each component-count boundary")
+    void formatsDurationPerIso8601(long durationSeconds, String expected) {
+        DashManifestConfigDTO dto = DashManifestConfigDTO.from(
+                streamInfo(durationSeconds, List.of(), List.of(), List.of()));
+
+        assertThat(dto.getMediaPresentationDuration()).isEqualTo(expected);
+    }
+
+    // ── JSON ─────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Round-trips scalar fields and stream-list sizes through serialize/deserialize")
+    void roundTripPreservesFieldsAndStreamCounts() throws Exception {
+        DashManifestConfigDTO original = DashManifestConfigDTO.from(
+                streamInfo(119L, List.of(videoStream()), List.of(audioStream()), List.of(subtitlesStream())));
+
+        DashManifestConfigDTO restored = objectMapper.readValue(
+                objectMapper.writeValueAsString(original), DashManifestConfigDTO.class);
+
+        assertThat(restored.getType()).isEqualTo(original.getType());
+        assertThat(restored.getMediaPresentationDuration()).isEqualTo(original.getMediaPresentationDuration());
+        assertThat(restored.getDurationSeconds()).isEqualTo(original.getDurationSeconds());
+        assertThat(restored.getVideoStreams()).hasSize(original.getVideoStreams().size());
+        assertThat(restored.getAudioStreams()).hasSize(original.getAudioStreams().size());
+        assertThat(restored.getSubtitleStreams()).hasSize(original.getSubtitleStreams().size());
+    }
+
+    // ── toString ─────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("toString includes type, duration, and each stream list's count")
+    void toStringIncludesKeyFieldsAndStreamCounts() {
+        String result = validBuilder().build().toString();
+
+        assertThat(result).contains("static", "PT1M59S", "119",
+                "videoStreams=0", "audioStreams=0", "subtitleStreams=0");
     }
 }

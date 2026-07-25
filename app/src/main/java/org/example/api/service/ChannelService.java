@@ -16,7 +16,7 @@ public class ChannelService {
             return ChannelInfo.getInfo(url);
         } catch (Exception e) {
             logger.error("Failed to extract channel info for URL: {}", url, e);
-            throw new ExtractionException(e.getMessage(), e.getCause());
+            throw new ExtractionException(e.getMessage(), e);
         }
     }
 }
