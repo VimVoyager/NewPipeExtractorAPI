@@ -20,8 +20,9 @@ import java.util.List;
 @RequestMapping("/api/v1/kiosks")
 public class KioskController {
     private static final Logger logger = LoggerFactory.getLogger(KioskController.class);
-
+    private static final int YOUTUBE_SERVICE_ID = 0;
     private final KioskService kioskService;
+
 
     @Autowired
     public KioskController(KioskService kioskService) {
@@ -30,15 +31,12 @@ public class KioskController {
 
     /**
      * Returns the kiosk IDs available for a service,
-     * e.g. ["trending_gaming", "trending_music", ..., "live"].
      */
     @GetMapping
-    public ResponseEntity<List<String>> getKioskIds(
-            @RequestParam(name = "serviceId") int serviceId
-    ) throws ExtractionException {
-        logger.info("Retrieving kiosk IDs for serviceId: {}", serviceId);
+    public ResponseEntity<List<String>> getKioskIds() throws ExtractionException {
+        logger.info("Retrieving kiosk IDs");
 
-        List<String> kioskIds = kioskService.getKioskIds(serviceId);
+        List<String> kioskIds = kioskService.getKioskIds(YOUTUBE_SERVICE_ID);
         return ResponseEntity.ok(kioskIds);
     }
 
@@ -47,21 +45,16 @@ public class KioskController {
      */
     @GetMapping("/{kioskId}")
     public ResponseEntity<KioskDTO> getKioskInfo(
-            @PathVariable(name = "kioskId") String kioskId,
-            @RequestParam(name = "serviceId") int serviceId
+            @PathVariable(name = "kioskId") String kioskId
     ) throws ExtractionException {
-        logger.info("Retrieving kiosk info for kioskId: {}, serviceId: {}", kioskId, serviceId);
+        logger.info("Retrieving kiosk info for kioskId: {}", kioskId);
 
-        KioskInfo info = kioskService.getKioskInfo(serviceId, kioskId);
+        KioskInfo info = kioskService.getKioskInfo(YOUTUBE_SERVICE_ID, kioskId);
         return ResponseEntity.ok(KioskDTO.from(info));
     }
 
     /**
      * Returns a subsequent page of kiosk items.
-     *
-     * <p>All {@code nextPage.*} parameters must be taken verbatim from the
-     * {@code nextPage} object in the previous response — same convention as
-     * the channel tab paging endpoint.</p>
      *
      * @param kioskId   kiosk ID — must match the initial request
      * @param serviceId service ID — must match the initial request
@@ -73,16 +66,15 @@ public class KioskController {
 //    @GetMapping("/{kioskId}/page")
 //    public ResponseEntity<KioskPageDTO> getKioskPage(
 //            @PathVariable(name = "kioskId") String kioskId,
-//            @RequestParam(name = "serviceId") int serviceId,
 //            @RequestParam(name = "pageUrl") String pageUrl,
 //            @RequestParam(name = "pageId", required = false) String pageId,
 //            @RequestParam(name = "pageIds", required = false) List<String> pageIds,
 //            @RequestParam(name = "pageBody", required = false) String pageBody
 //    ) throws ExtractionException {
-//        logger.info("Retrieving kiosk page for kioskId: {}, serviceId: {}", kioskId, serviceId);
+//        logger.info("Retrieving kiosk page for kioskId: {}", kioskId);
 //
 //        Page page = KioskDTO.NextPageDTO.toPage(pageUrl, pageId, pageIds, pageBody);
-//        InfoItemsPage<StreamInfoItem> result = kioskService.getKioskPage(serviceId, kioskId, page);
+//        InfoItemsPage<StreamInfoItem> result = kioskService.getKioskPage(YOUTUBE_SERVICE_ID, kioskId, page);
 //
 //        return ResponseEntity.ok(KioskPageDTO.from(result));
 //    }
