@@ -167,7 +167,25 @@ public class DashManifestGeneratorService {
     private String generateVideoAdaptationSets(List<VideoStreamMetadataDTO> videoStreams) {
         StringBuilder xml = new StringBuilder();
 
-        Map<String, List<VideoStreamMetadataDTO>> streamsByCodec = videoStreams.stream()
+        List<VideoStreamMetadataDTO> rangeBacked = videoStreams.stream()
+                .filter(video -> {
+                    if (hasByteRanges(video.getInitRange(), video.getIndexRange())) {
+                        return true;
+                    }
+                    logger.warn("Video stream {} ({}p) has no byte ranges; not usable under profile {}",
+                            video.getId(), video.getHeight(), DASH_PROFILE);
+                    return false;
+                })
+                .toList();
+
+        List<VideoStreamMetadataDTO> usable = rangeBacked;
+        if (rangeBacked.isEmpty()) {
+            logger.error("No video streams carry byte ranges; emitting all {} without SegmentBase",
+                    videoStreams.size());
+            usable = videoStreams;
+        }
+
+        Map<String, List<VideoStreamMetadataDTO>> streamsByCodec = usable.stream()
                 .collect(Collectors.groupingBy(
                         this::videoAdaptationSetKey,
                         LinkedHashMap::new,
@@ -214,6 +232,11 @@ public class DashManifestGeneratorService {
                 .mapToInt(VideoStreamMetadataDTO::getHeight)
                 .max()
                 .orElse(0);
+    }
+
+    private boolean hasByteRanges(String initRange, String indexRange) {
+        return initRange != null && !initRange.isBlank()
+                && indexRange != null && !indexRange.isBlank();
     }
 
     /**
@@ -309,8 +332,21 @@ public class DashManifestGeneratorService {
     private String generateAudioAdaptationSets(List<AudioStreamMetadataDTO> audioStreams) {
         StringBuilder xml = new StringBuilder();
 
+        List<AudioStreamMetadataDTO> rangeBacked = audioStreams.stream()
+                .filter(audio -> {
+                    if (hasByteRanges(audio.getInitRange(), audio.getIndexRange())) {
+                        return true;
+                    }
+                    logger.warn("Audio stream {} ({}) has no byte ranges; not usable under profile {}",
+                            audio.getId(), audio.getLanguage(), DASH_PROFILE);
+                    return false;
+                })
+                .toList();
+
+        List<AudioStreamMetadataDTO> usable = rangeBacked.isEmpty() ? audioStreams : rangeBacked;
+
         // Group by language
-        Map<String, List<AudioStreamMetadataDTO>> streamsByLanguage = audioStreams.stream()
+        Map<String, List<AudioStreamMetadataDTO>> streamsByLanguage = usable.stream()
                 .collect(Collectors.groupingBy(
                         audio -> audio.getLanguage() != null ? audio.getLanguage() : "und"
                 ));
