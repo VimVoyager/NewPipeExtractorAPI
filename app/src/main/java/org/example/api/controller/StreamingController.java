@@ -121,7 +121,7 @@ public class StreamingController {
                 allVideoStreams.size(), allAudioStreams.size(), allSubtitles.size());
 
         // SABR fallback: if adaptive streams are unavailable, use muxed streams (360p only)
-        boolean isMuxedFallback = allVideoStreams.isEmpty() && allSubtitles.isEmpty();
+        boolean isMuxedFallback = allVideoStreams.isEmpty();
 
         if (isMuxedFallback) {
             List<VideoStream> muxedStreams = streamInfo.getVideoStreams();
