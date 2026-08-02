@@ -192,6 +192,15 @@ public class StreamSelectionService {
     }
 
     /**
+     * Extracts language code from a subtitle stream
+     */
+    private String extractLanguage(SubtitlesStream subtitle) {
+        return normalizeLanguageCode(
+                subtitle.getLocale() != null ? subtitle.getLocale().toLanguageTag(): "und"
+        );
+    }
+
+    /**
      * Normalizes language code to standard format
      */
     private String normalizeLanguageCode(String languageCode) {
@@ -277,17 +286,35 @@ public class StreamSelectionService {
     }
 
     /**
-     * Filters subtitles by preferred formats
+     * Filters subtitles by preferred format, applying the preference cascade
+     * independently within each language group. A language is never dropped
+     * because a different language happened to match a higher-ranked format.
      */
     private List<SubtitlesStream> filterSubtitlesByFormat(List<SubtitlesStream> subtitles) {
-        // Try preferred formats in order
+        Map<String, List<SubtitlesStream>> languageGroups = new LinkedHashMap<>();
+
+        for (SubtitlesStream subtitle : subtitles) {
+            languageGroups
+                    .computeIfAbsent(extractLanguage(subtitle), k -> new ArrayList<>())
+                    .add(subtitle);
+        }
+
+        List<SubtitlesStream> selected = new ArrayList<>();
+        for (Map.Entry<String, List<SubtitlesStream>> entry : languageGroups.entrySet()) {
+            selected.addAll(filterGroupByFormat(entry.getKey(), entry.getValue()));
+        }
+
+        return selected;
+    }
+
+    /**
+     * Applies the format preference cascade to a single language group,
+     * falling back to the untouched group if no preferred format is present.
+     */
+    private List<SubtitlesStream> filterGroupByFormat(String language, List<SubtitlesStream> group) {
         for (String format : PREFERRED_SUBTITLE_FORMATS) {
-            List<SubtitlesStream> filtered = subtitles.stream()
-                    .filter(sub -> {
-                        assert sub.getFormat() != null;
-                        return format.equalsIgnoreCase(sub.getFormat().getName()) ||
-                                format.equalsIgnoreCase(sub.getFormat().getSuffix());
-                    })
+            List<SubtitlesStream> filtered = group.stream()
+                    .filter(sub -> matchesFormat(sub, format))
                     .collect(Collectors.toList());
 
             if (!filtered.isEmpty()) {
@@ -295,8 +322,15 @@ public class StreamSelectionService {
             }
         }
 
-        // Fallback: return all if no preferred format found
-        return subtitles;
+        logger.debug("No preferred subtitle format for language '{}', keeping all {} track(s)",
+                language, group.size());
+        return group;
+    }
+
+    private boolean matchesFormat(SubtitlesStream subtitle, String format) {
+        return subtitle.getFormat() != null
+                && (format.equalsIgnoreCase(subtitle.getFormat().getName())
+                || format.equalsIgnoreCase(subtitle.getFormat().getSuffix()));
     }
 
     /**
