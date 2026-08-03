@@ -37,7 +37,7 @@ public class StreamSelectionService {
 
     private static final int UNKNOWN_BITRATE =  -1;
 
-    private static final Pattern RESOLUTION_HEIGHT = Pattern.compile("^(\\d+)");
+    private static final Pattern RESOLUTION_HEIGHT = Pattern.compile("^(\\d{3,4})(?=p|$)");
 
     private static final int MIN_VIDEO_QUALITIES = 3;
 

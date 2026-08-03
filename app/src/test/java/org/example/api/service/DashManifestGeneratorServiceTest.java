@@ -306,7 +306,7 @@ class DashManifestGeneratorServiceTest {
             assertThat(sets).extracting(s -> s.getAttribute("lang"))
                     .containsExactly("und", "en", "de", "es");
             assertThat(sets).extracting(s -> s.getAttribute("id"))
-                    .containsExactly("1", "2", "3", "4");
+                    .containsExactly("50", "51", "52", "53");
             assertThat(sets).allSatisfy(s ->
                     assertThat(s.getAttribute("contentType")).isEqualTo("audio"));
 
@@ -327,11 +327,16 @@ class DashManifestGeneratorServiceTest {
             top.setInitRange("0-640");
             top.setIndexRange("641-900");
 
+            AudioStreamMetadataDTO mid = createAudioStream("audio-128", "en", 128000);
+            mid.setInitRange("0-620");
+            mid.setIndexRange("621-880");
+
+            AudioStreamMetadataDTO low = createAudioStream("audio-64", "en", 64000);
+            low.setInitRange("0-600");
+            low.setIndexRange("601-860");
+
             DashManifestConfigDTO config = createBasicConfig();
-            config.setAudioStreams(List.of(
-                    createAudioStream("audio-64", "en", 64000),
-                    top,
-                    createAudioStream("audio-128", "en", 128000)));
+            config.setAudioStreams(List.of(low, top, mid));
 
             Document doc = parse(service.generateManifestXml(config));
 
