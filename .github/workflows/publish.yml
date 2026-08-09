@@ -1,0 +1,111 @@
+# Publishes a release when a vX.Y.Z tag is pushed.
+#
+# Builds the tagged commit — not whatever main happens to be at — and
+# derives every Docker tag from the git tag, so the two can never drift.
+#
+# Requires two repository secrets:
+#   DOCKERHUB_USERNAME  - Docker Hub account name
+#   DOCKERHUB_TOKEN     - Docker Hub access token (not the password)
+
+name: publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  # TODO: set to the real Docker Hub repository for this service
+  IMAGE_NAME: mrtumble/opentube-backend
+  JAVA_VERSION: '21'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      # Manual version bumps can drift from the tag. Catching it here is
+      # cheaper than shipping an image whose reported version is a lie.
+      - name: Verify pom version matches the tag
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          POM_VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          echo "tag=$TAG_VERSION pom=$POM_VERSION"
+          if [ "$TAG_VERSION" != "$POM_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match pom.xml version $POM_VERSION"
+            exit 1
+          fi
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # type=semver strips the leading v. `latest` is applied only to the
+      # highest non-prerelease version, and a tag like v1.3.0-rc.1 is
+      # recognised as a prerelease, so it receives only its full version.
+      - name: Derive image tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Pulls the section for this version out of CHANGELOG.md: start at
+      # the matching heading, stop at the next one.
+      - name: Extract release notes
+        id: notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { flag = 1; next }
+            /^## \[/ { flag = 0 }
+            flag
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No CHANGELOG section for $VERSION" > release-notes.md
+          fi
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRERELEASE=""
+          case "$GITHUB_REF_NAME" in
+            *-*) PRERELEASE="--prerelease" ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag \
+            $PRERELEASE
