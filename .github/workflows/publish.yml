@@ -44,7 +44,7 @@ jobs:
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           POM_VERSION="$(python3 -c "
           import xml.etree.ElementTree as ET
-          root = ET.parse('pom.xml').getroot()
+          root = ET.parse('app/pom.xml').getroot()
           ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
           print(root.findtext('m:version', namespaces=ns).strip())
           ")"
@@ -80,6 +80,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
