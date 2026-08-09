@@ -42,8 +42,12 @@ jobs:
       - name: Verify pom version matches the tag
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          POM_VERSION="$(xmllint --xpath \
-            "string(/*[local-name()='project']/*[local-name()='version'])" pom.xml)"
+          POM_VERSION="$(python3 -c "
+          import xml.etree.ElementTree as ET
+          root = ET.parse('pom.xml').getroot()
+          ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+          print(root.findtext('m:version', namespaces=ns).strip())
+          ")"
           echo "tag=$TAG_VERSION pom=$POM_VERSION"
           [ "$TAG_VERSION" = "$POM_VERSION" ] || {
             echo "::error::Tag $GITHUB_REF_NAME does not match pom.xml version $POM_VERSION"
