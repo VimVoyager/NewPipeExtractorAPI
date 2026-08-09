@@ -6,6 +6,15 @@ The format is based on [keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+ - Kiosk endpoints moved out of `NewPipeController`/`RestService` into a dedicated `KioskController` and `KioskService`
+ - Kiosk responses now return typed DTOs with ISO-8601 timestamps instead of serialised extractor objects
+
+### Removed
+ 
+ - Kiosk pagination endpoint (`GET /api/v1/kiosks/{kioskId}/page`) - YouTube kiosk feeds return no continuation token and are single-page by design
+
 ## [0.1.1] - 2026-08-09
 
 ### Fixed
