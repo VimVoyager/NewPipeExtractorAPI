@@ -25,6 +25,11 @@ public class DashManifestGeneratorService {
 
     private static final String DASH_NAMESPACE = "urn:mpeg:dash:schema:mpd:2011";
     private static final String DASH_PROFILE = "urn:mpeg:dash:profile:isoff-on-demand:2011";
+    private static final String DEFAULT_VIDEO_MIME_TYPE = "video/mp4";
+
+    private static final int VIDEO_ADAPTATION_SET_ID_BASE = 0;
+    private static final int AUDIO_ADAPTATION_SET_ID_BASE = 50;
+    private static final int SUBTITLE_ADAPTATION_SET_ID_BASE = 100;
 
     /**
      * Generates a complete DASH manifest XML from StreamInfo.
@@ -134,7 +139,7 @@ public class DashManifestGeneratorService {
 
         // Video AdaptationSet (if video streams exist)
         if (!config.getVideoStreams().isEmpty()) {
-            period.append(generateVideoAdaptationSet(config.getVideoStreams()));
+            period.append(generateVideoAdaptationSets(config.getVideoStreams()));
         }
 
         // Audio AdaptationSets (grouped by language)
@@ -154,12 +159,95 @@ public class DashManifestGeneratorService {
     }
 
     /**
-     * Generates the video AdaptationSet with all video quality representations.
+     * Generates the video AdaptationSets, one per codec family.
      *
      * @param videoStreams List of all video streams
+     * @return Video AdaptationSets XML string
+     */
+    private String generateVideoAdaptationSets(List<VideoStreamMetadataDTO> videoStreams) {
+        StringBuilder xml = new StringBuilder();
+
+        List<VideoStreamMetadataDTO> rangeBacked = videoStreams.stream()
+                .filter(video -> {
+                    if (hasByteRanges(video.getInitRange(), video.getIndexRange())) {
+                        return true;
+                    }
+                    logger.warn("Video stream {} ({}p) has no byte ranges; not usable under profile {}",
+                            video.getId(), video.getHeight(), DASH_PROFILE);
+                    return false;
+                })
+                .toList();
+
+        List<VideoStreamMetadataDTO> usable = rangeBacked;
+        if (rangeBacked.isEmpty()) {
+            logger.error("No video streams carry byte ranges; emitting all {} without SegmentBase",
+                    videoStreams.size());
+            usable = videoStreams;
+        }
+
+        Map<String, List<VideoStreamMetadataDTO>> streamsByCodec = usable.stream()
+                .collect(Collectors.groupingBy(
+                        this::videoAdaptationSetKey,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
+        // Highest-resolution group first; key as a stable tie-break
+        List<String> sortedKeys = streamsByCodec.keySet().stream()
+                .sorted(Comparator
+                        .comparingInt((String key) -> maxHeight(streamsByCodec.get(key)))
+                        .reversed()
+                        .thenComparing(Comparator.naturalOrder()))
+                .toList();
+
+        int adaptationSetId = VIDEO_ADAPTATION_SET_ID_BASE;
+        for (String key : sortedKeys) {
+            xml.append(generateVideoAdaptationSet(streamsByCodec.get(key), adaptationSetId));
+            adaptationSetId++;
+        }
+
+        logger.debug("Generated {} video AdaptationSet(s) from {} stream(s)",
+                sortedKeys.size(), videoStreams.size());
+
+        return xml.toString();
+    }
+
+    private String videoAdaptationSetKey(VideoStreamMetadataDTO video) {
+        String codec = video.getCodec();
+        String codecFamily = (codec == null || codec.isBlank())
+                ? "unknown"
+                : codec.trim().split("\\.")[0].toLowerCase();
+
+        return resolveVideoMimeType(video) + "|" + codecFamily;
+    }
+
+    private String resolveVideoMimeType(VideoStreamMetadataDTO video) {
+        return (video.getMimeType() != null && !video.getMimeType().isBlank())
+                ? video.getMimeType()
+                : DEFAULT_VIDEO_MIME_TYPE;
+    }
+
+    private int maxHeight(List<VideoStreamMetadataDTO> streams) {
+        return streams.stream()
+                .mapToInt(VideoStreamMetadataDTO::getHeight)
+                .max()
+                .orElse(0);
+    }
+
+    private boolean hasByteRanges(String initRange, String indexRange) {
+        return initRange != null && !initRange.isBlank()
+                && indexRange != null && !indexRange.isBlank();
+    }
+
+    /**
+     * Generates a single video AdaptationSet for one codec family.
+     *
+     * @param videoStreams Video streams sharing a mimeType and codec family
+     * @param adaptationSetId ID for this AdaptationSet
      * @return Video AdaptationSet XML string
      */
-    private String generateVideoAdaptationSet(List<VideoStreamMetadataDTO> videoStreams) {
+    private String generateVideoAdaptationSet(List<VideoStreamMetadataDTO> videoStreams,
+                                              int adaptationSetId) {
         StringBuilder xml = new StringBuilder();
 
         // Sort by quality (highest first)
@@ -167,17 +255,13 @@ public class DashManifestGeneratorService {
                 .sorted(Comparator.comparingInt(VideoStreamMetadataDTO::getHeight).reversed())
                 .toList();
 
-        // Get the most common mimeType
-        String mimeType = sorted.stream()
-                .map(VideoStreamMetadataDTO::getMimeType)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse("video/mp4");
+        // Every stream in this group shares the key, so any member gives the mimeType
+        String mimeType = resolveVideoMimeType(sorted.getFirst());
 
         xml.append(ManifestXmlBuilder.indent(2))
                 .append("<AdaptationSet\n");
         xml.append(ManifestXmlBuilder.indent(3))
-                .append("id=\"0\"\n");
+                .append("id=\"").append(adaptationSetId).append("\"\n");
         xml.append(ManifestXmlBuilder.indent(3))
                 .append("contentType=\"video\"\n");
         xml.append(ManifestXmlBuilder.indent(3))
@@ -187,7 +271,6 @@ public class DashManifestGeneratorService {
         xml.append(ManifestXmlBuilder.indent(3))
                 .append("startWithSAP=\"1\">\n");
 
-        // Generate representations for each quality
         for (VideoStreamMetadataDTO video : sorted) {
             xml.append(generateVideoRepresentation(video));
         }
@@ -249,8 +332,21 @@ public class DashManifestGeneratorService {
     private String generateAudioAdaptationSets(List<AudioStreamMetadataDTO> audioStreams) {
         StringBuilder xml = new StringBuilder();
 
+        List<AudioStreamMetadataDTO> rangeBacked = audioStreams.stream()
+                .filter(audio -> {
+                    if (hasByteRanges(audio.getInitRange(), audio.getIndexRange())) {
+                        return true;
+                    }
+                    logger.warn("Audio stream {} ({}) has no byte ranges; not usable under profile {}",
+                            audio.getId(), audio.getLanguage(), DASH_PROFILE);
+                    return false;
+                })
+                .toList();
+
+        List<AudioStreamMetadataDTO> usable = rangeBacked.isEmpty() ? audioStreams : rangeBacked;
+
         // Group by language
-        Map<String, List<AudioStreamMetadataDTO>> streamsByLanguage = audioStreams.stream()
+        Map<String, List<AudioStreamMetadataDTO>> streamsByLanguage = usable.stream()
                 .collect(Collectors.groupingBy(
                         audio -> audio.getLanguage() != null ? audio.getLanguage() : "und"
                 ));
@@ -266,7 +362,7 @@ public class DashManifestGeneratorService {
                 })
                 .toList();
 
-        int adaptationSetId = 1;
+        int adaptationSetId = AUDIO_ADAPTATION_SET_ID_BASE;
         for (String language : sortedLanguages) {
             List<AudioStreamMetadataDTO> languageStreams = streamsByLanguage.get(language);
             xml.append(generateAudioAdaptationSet(languageStreams, adaptationSetId, language));
@@ -399,7 +495,7 @@ public class DashManifestGeneratorService {
                 .sorted()
                 .toList();
 
-        int adaptationSetId = 100; // Start subtitle IDs at 100 to avoid conflicts
+        int adaptationSetId = SUBTITLE_ADAPTATION_SET_ID_BASE;
         for (String language : sortedLanguages) {
             List<SubtitleMetadataDTO> languageSubtitles = streamsByLanguage.get(language);
 

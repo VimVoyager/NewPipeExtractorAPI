@@ -1,6 +1,8 @@
 package org.example.api.service;
 
 import org.schabi.newpipe.extractor.stream.AudioStream;
+import org.schabi.newpipe.extractor.stream.DeliveryMethod;
+import org.schabi.newpipe.extractor.stream.Stream;
 import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.slf4j.Logger;
@@ -8,6 +10,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -20,25 +24,20 @@ public class StreamSelectionService {
 
     private static final Logger logger = LoggerFactory.getLogger(StreamSelectionService.class);
 
-    private static final List<String> PREFERRED_AUDIO_ITAGS = List.of(
-            "141", // m4a 256kbps
-            "140", // m4a 128kbps
-            "251", // webm 160kbps
-            "250", // webm 70kbps
-            "249", // webm 50kbps
-            "139"  // m4a 48kbps
+    private static final List<String> PREFERRED_AUDIO_CODECS = List.of(
+            "mp4a",   // AAC in MP4 - broadest MSE support
+            "m4a",    // MediaFormat.M4A reports this rather than mp4a
+            "aac",
+            "opus",   // better per-bit quality, no Safari MSE support
+            "vorbis",
+            "mp3"
     );
 
-    private static final List<String> QUALITY_LEVELS = List.of(
-            "2160p", // 4K
-            "1440p", // 2K
-            "1080p", // Full HD
-            "720p",  // HD
-            "480p",  // SD
-            "360p",
-            "240p",
-            "144p"
-    );
+    private static final int UNRANKED_CODEC = PREFERRED_AUDIO_CODECS.size();
+
+    private static final int UNKNOWN_BITRATE =  -1;
+
+    private static final Pattern RESOLUTION_HEIGHT = Pattern.compile("^(\\d{3,4})(?=p|$)");
 
     private static final int MIN_VIDEO_QUALITIES = 3;
 
@@ -47,6 +46,11 @@ public class StreamSelectionService {
     private static final List<String> PREFERRED_SUBTITLE_FORMATS = List.of(
             "vtt", "srv3", "srv2", "srv1", "ttml"
     );
+
+    /** Codec first, then bitrate descending. */
+    private static final Comparator<AudioStream> AUDIO_PREFERENCE =
+            Comparator.<AudioStream>comparingInt(StreamSelectionService::audioCodecRank)
+                    .thenComparing(Comparator.<AudioStream>comparingInt(StreamSelectionService::bitrateOf).reversed());
 
     /**
      * Select optimal video streams for DASH manifest
@@ -58,51 +62,80 @@ public class StreamSelectionService {
             return Collections.emptyList();
         }
 
-        logger.info("Selecting from {} total video streams", allVideoStreams.size());
+        List<VideoStream> candidates = filterProgressiveHttp(allVideoStreams, "video");
+        if (candidates.isEmpty()) {
+            logger.warn("No progressive HTTP video streams available for selection");
+            return Collections.emptyList();
+        }
 
-        List<VideoStream> selectedStreams = new ArrayList<>();
+        logger.info("Selecting from {} usable video streams", candidates.size());
 
-        // First pass: Try to get one stream per quality level
-        for (String quality : QUALITY_LEVELS) {
-            Optional<VideoStream> match = allVideoStreams.stream()
-                    .filter(s -> quality.equals(s.getResolution()))
-                    .filter(s -> selectedStreams.stream()
-                            .noneMatch(existing -> quality.equals(existing.getResolution())))
-                    .findFirst();
+        // One stream per distinct height, keeping the highest bitrate at each
+        Map<Integer, VideoStream> bestByHeight = new HashMap<>();
+        for (VideoStream stream : candidates) {
+            int height = heightOf(stream);
+            if (height <= 0) {
+                logger.debug("Video stream {} has no usable height (resolution '{}'); left to the bitrate fallback",
+                        stream.getId(), stream.getResolution());
+                continue;
+            }
+            bestByHeight.merge(height, stream,
+                    (existing, other) -> other.getBitrate() > existing.getBitrate() ? other : existing);
+        }
 
-            match.ifPresent(selectedStreams::add);
+        List<VideoStream> selectedStreams = bestByHeight.entrySet().stream()
+                .sorted(Map.Entry.<Integer, VideoStream>comparingByKey().reversed())
+                .map(Map.Entry::getValue)
+                .limit(MAX_VIDEO_QUALITIES)
+                .collect(Collectors.toCollection(ArrayList::new));
 
-            // Stop if we have enough qualities
-            if (selectedStreams.size() >= MAX_VIDEO_QUALITIES) {
-                break;
+        // Top up with the highest-bitrate leftovers if we are under the minimum
+        if (selectedStreams.size() < MIN_VIDEO_QUALITIES) {
+            candidates.stream()
+                    .filter(s -> selectedStreams.stream().noneMatch(selected -> selected == s))
+                    .sorted(Comparator.comparingInt(VideoStream::getBitrate).reversed())
+                    .limit(MIN_VIDEO_QUALITIES - selectedStreams.size())
+                    .forEach(selectedStreams::add);
+
+            selectedStreams.sort(Comparator.comparingInt(StreamSelectionService::heightOf).reversed());
+        }
+
+        logger.info("Selected {} video streams from {} available",
+                selectedStreams.size(), allVideoStreams.size());
+        return selectedStreams;
+    }
+
+    /**
+     * Numeric height for a video stream, preferring ItagItem metadata and
+     * falling back to parsing the resolution label. Returns 0 when unknown.
+     */
+    private static int heightOf(VideoStream stream) {
+        if (stream.getItagItem() != null && stream.getItagItem().getHeight() > 0) {
+            return stream.getItagItem().getHeight();
+        }
+
+        String resolution = stream.getResolution();
+        if (resolution == null) {
+            return 0;
+        }
+
+        Matcher matcher = RESOLUTION_HEIGHT.matcher(resolution.trim());
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
+    }
+
+    private <T extends Stream> List<T> filterProgressiveHttp(List<T> streams, String kind) {
+        List<T> progressive = new ArrayList<>();
+
+        for (T stream : streams) {
+            if (stream.getDeliveryMethod() == DeliveryMethod.PROGRESSIVE_HTTP) {
+                progressive.add(stream);
+            } else {
+                logger.warn("Skipping {} stream {} with unsupported delivery method {}",
+                        kind, stream.getId(), stream.getDeliveryMethod());
             }
         }
 
-        // Second pass: If we don't have minimum qualities, add by highest bitrate
-        if (selectedStreams.size() < MIN_VIDEO_QUALITIES) {
-            List<VideoStream> remainingStreams = allVideoStreams.stream()
-                    .filter(s -> selectedStreams.stream()
-                            .noneMatch(existing -> existing.getId().equals(s.getId())))
-                    .sorted((s1, s2) -> Integer.compare(s2.getBitrate(), s1.getBitrate()))
-                    .limit(MIN_VIDEO_QUALITIES - selectedStreams.size())
-                    .toList();
-
-            selectedStreams.addAll(remainingStreams);
-        }
-
-        // Sort by quality (highest first) for better player behavior
-        selectedStreams.sort((a, b) -> {
-            int qualityIndexA = QUALITY_LEVELS.indexOf(a.getResolution());
-            int qualityIndexB = QUALITY_LEVELS.indexOf(b.getResolution());
-
-            if (qualityIndexA == -1) qualityIndexA = Integer.MAX_VALUE;
-            if (qualityIndexB == -1) qualityIndexB = Integer.MAX_VALUE;
-
-            return Integer.compare(qualityIndexA, qualityIndexB);
-        });
-
-        logger.info("Selected {} video streams from {} available", selectedStreams.size(), allVideoStreams.size());
-        return selectedStreams;
+        return progressive;
     }
 
     /**
@@ -115,10 +148,15 @@ public class StreamSelectionService {
             return Collections.emptyList();
         }
 
-        logger.info("Selecting from {} total audio streams", allAudioStreams.size());
+        List<AudioStream> candidates = filterProgressiveHttp(allAudioStreams, "audio");
+        if (candidates.isEmpty()) {
+            logger.warn("No progressive HTTP audio streams available for selection");
+            return Collections.emptyList();
+        }
 
-        // Group streams by language
-        Map<String, List<AudioStream>> languageGroups = groupAudioStreamsByLanguage(allAudioStreams);
+        logger.info("Selecting from {} usable audio streams", candidates.size());
+
+        Map<String, List<AudioStream>> languageGroups = groupAudioStreamsByLanguage(candidates);
 
         List<AudioStream> selectedStreams = new ArrayList<>();
 
@@ -192,6 +230,15 @@ public class StreamSelectionService {
     }
 
     /**
+     * Extracts language code from a subtitle stream
+     */
+    private String extractLanguage(SubtitlesStream subtitle) {
+        return normalizeLanguageCode(
+                subtitle.getLocale() != null ? subtitle.getLocale().toLanguageTag(): "und"
+        );
+    }
+
+    /**
      * Normalizes language code to standard format
      */
     private String normalizeLanguageCode(String languageCode) {
@@ -202,43 +249,56 @@ public class StreamSelectionService {
     }
 
     /**
-     * Select the best stream from a group of same-language streams
+     * Select the best stream from a group of same-language streams.
+     * Codec preference wins; bitrate breaks ties.
      */
     private AudioStream selectBestStreamForLanguage(List<AudioStream> streams) {
-        if (streams.isEmpty()) {
-            return null;
+        return streams.stream()
+                .min(AUDIO_PREFERENCE)
+                .orElse(null);
+    }
+
+    /** Position in PREFERRED_AUDIO_CODECS; unknown codecs sort last. */
+    private static int audioCodecRank(AudioStream stream) {
+        String codec = audioCodecOf(stream);
+        if (codec == null) {
+            return UNRANKED_CODEC;
         }
 
-        // First, try preferred itag
-        for (String itag : PREFERRED_AUDIO_ITAGS) {
-            Optional<AudioStream> match = streams.stream()
-                    .filter(s -> {
-                        assert s.getItagItem() != null;
-                        return String.valueOf(s.getItagItem().id).equals(itag);
-                    })
-                    .findFirst();
-            if (match.isPresent()) {
-                return match.get();
+        for (int i = 0; i < PREFERRED_AUDIO_CODECS.size(); i++) {
+            if (codec.contains(PREFERRED_AUDIO_CODECS.get(i))) {
+                return i;
             }
         }
 
-        // Fallback: Best M4A/AAC stream by bitrate
-        Optional<AudioStream> m4aStream = streams.stream()
-                .filter(s -> s.getFormat() != null &&
-                        (s.getFormat().getName().equalsIgnoreCase("M4A") ||
-                                s.getFormat().getName().equalsIgnoreCase("MP4A")))
-                .max(Comparator.comparingInt(s -> {
-                    assert s.getItagItem() != null;
-                    return s.getItagItem().getBitrate();
-                }));
+        return UNRANKED_CODEC;
+    }
 
-        return m4aStream.orElseGet(() -> streams.stream()
-                .max(Comparator.comparingInt(s -> {
-                    assert s.getItagItem() != null;
-                    return s.getItagItem().getBitrate();
-                }))
-                .orElse(null));
+    /** Codec identity from ItagItem when present, else from the MediaFormat. */
+    private static String audioCodecOf(AudioStream stream) {
+        if (stream.getItagItem() != null
+                && stream.getItagItem().getCodec() != null
+                && !stream.getItagItem().getCodec().isBlank()) {
+            return stream.getItagItem().getCodec().toLowerCase();
+        }
 
+        if (stream.getFormat() != null) {
+            return (stream.getFormat().getName() + " " + stream.getFormat().getSuffix()).toLowerCase();
+        }
+
+        return null;
+    }
+
+    private static int bitrateOf(AudioStream stream) {
+        if (stream.getAverageBitrate() > 0) {
+            return stream.getAverageBitrate();
+        }
+
+        return stream.getItagItem() != null ? stream.getItagItem().getBitrate() : UNKNOWN_BITRATE;
+    }
+
+    private static String formatName(Stream stream) {
+        return stream.getFormat() != null ? stream.getFormat().getName() : "unknown";
     }
 
     /**
@@ -277,17 +337,35 @@ public class StreamSelectionService {
     }
 
     /**
-     * Filters subtitles by preferred formats
+     * Filters subtitles by preferred format, applying the preference cascade
+     * independently within each language group. A language is never dropped
+     * because a different language happened to match a higher-ranked format.
      */
     private List<SubtitlesStream> filterSubtitlesByFormat(List<SubtitlesStream> subtitles) {
-        // Try preferred formats in order
+        Map<String, List<SubtitlesStream>> languageGroups = new LinkedHashMap<>();
+
+        for (SubtitlesStream subtitle : subtitles) {
+            languageGroups
+                    .computeIfAbsent(extractLanguage(subtitle), k -> new ArrayList<>())
+                    .add(subtitle);
+        }
+
+        List<SubtitlesStream> selected = new ArrayList<>();
+        for (Map.Entry<String, List<SubtitlesStream>> entry : languageGroups.entrySet()) {
+            selected.addAll(filterGroupByFormat(entry.getKey(), entry.getValue()));
+        }
+
+        return selected;
+    }
+
+    /**
+     * Applies the format preference cascade to a single language group,
+     * falling back to the untouched group if no preferred format is present.
+     */
+    private List<SubtitlesStream> filterGroupByFormat(String language, List<SubtitlesStream> group) {
         for (String format : PREFERRED_SUBTITLE_FORMATS) {
-            List<SubtitlesStream> filtered = subtitles.stream()
-                    .filter(sub -> {
-                        assert sub.getFormat() != null;
-                        return format.equalsIgnoreCase(sub.getFormat().getName()) ||
-                                format.equalsIgnoreCase(sub.getFormat().getSuffix());
-                    })
+            List<SubtitlesStream> filtered = group.stream()
+                    .filter(sub -> matchesFormat(sub, format))
                     .collect(Collectors.toList());
 
             if (!filtered.isEmpty()) {
@@ -295,8 +373,15 @@ public class StreamSelectionService {
             }
         }
 
-        // Fallback: return all if no preferred format found
-        return subtitles;
+        logger.debug("No preferred subtitle format for language '{}', keeping all {} track(s)",
+                language, group.size());
+        return group;
+    }
+
+    private boolean matchesFormat(SubtitlesStream subtitle, String format) {
+        return subtitle.getFormat() != null
+                && (format.equalsIgnoreCase(subtitle.getFormat().getName())
+                || format.equalsIgnoreCase(subtitle.getFormat().getSuffix()));
     }
 
     /**
@@ -351,35 +436,28 @@ public class StreamSelectionService {
      * Log selected streams for debugging
      */
     public void logSelectedStreams(List<VideoStream> videoStreams, List<AudioStream> audioStreams) {
-        if (videoStreams.isEmpty()) {
+        if (videoStreams == null || videoStreams.isEmpty()) {
             logger.warn("No suitable video streams found");
         } else {
             logger.info("Selected {} video streams:", videoStreams.size());
             for (int i = 0; i < videoStreams.size(); i++) {
                 VideoStream stream = videoStreams.get(i);
-                assert stream.getFormat() != null;
-                assert stream.getItagItem() != null;
                 logger.info("  {}. {} - {} - {} bps",
-                        i + 1, stream.getResolution(), stream.getFormat().getName(),
-                        stream.getItagItem().getBitrate());
+                        i + 1, stream.getResolution(), formatName(stream), stream.getBitrate());
             }
         }
 
-        if (audioStreams.isEmpty()) {
+        if (audioStreams == null || audioStreams.isEmpty()) {
             logger.warn("No suitable audio streams found");
         } else {
             logger.info("Selected {} audio streams:", audioStreams.size());
             for (int i = 0; i < audioStreams.size(); i++) {
                 AudioStream stream = audioStreams.get(i);
-                String language = extractLanguage(stream);
                 String languageName = stream.getAudioTrackName() != null
                         ? stream.getAudioTrackName()
                         : "Unknown";
-                assert stream.getFormat() != null;
-                assert stream.getItagItem() != null;
                 logger.info("  {}. {} ({}) - {} - {} bps",
-                        i + 1, languageName, language, stream.getFormat().getName(),
-                        stream.getItagItem().getBitrate());
+                        i + 1, languageName, extractLanguage(stream), formatName(stream), bitrateOf(stream));
             }
         }
     }
@@ -397,15 +475,12 @@ public class StreamSelectionService {
         for (int i = 0; i < subtitles.size(); i++) {
             SubtitlesStream subtitle = subtitles.get(i);
             String type = subtitle.isAutoGenerated() ? "auto" : "manual";
-            String lang = normalizeLanguageCode(
-                    subtitle.getLocale() != null ? subtitle.getLocale().toLanguageTag() : "und"
-            );
+            String lang = extractLanguage(subtitle);
             String displayName = subtitle.getDisplayLanguageName() != null
                     ? subtitle.getDisplayLanguageName()
                     : lang.toUpperCase();
-            assert subtitle.getFormat() != null;
             logger.info("  {}. {} ({}) - {} [{}]",
-                    i + 1, displayName, lang, subtitle.getFormat().getName(), type);
+                    i + 1, displayName, lang, formatName(subtitle), type);
         }
     }
 }
