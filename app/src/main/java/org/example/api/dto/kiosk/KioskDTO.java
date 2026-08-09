@@ -88,15 +88,5 @@ public record KioskDTO(
                             : null
             );
         }
-
-        public static Page toPage(String url, String id, List<String> ids, String body) {
-            return new Page(
-                    url,
-                    id,
-                    ids,
-                    null,
-                    body != null ? Base64.getDecoder().decode(body) : null
-            );
-        }
     }
 }

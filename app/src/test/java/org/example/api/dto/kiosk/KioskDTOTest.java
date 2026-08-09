@@ -1,7 +1,6 @@
-package org.example.api.dto;
+package org.example.api.dto.kiosk;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.api.dto.kiosk.KioskDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -196,30 +195,6 @@ class KioskDTOTest {
             Page page = new Page("https://youtube.com/next", "pageId", List.of("id1"), null, null);
 
             assertThat(KioskDTO.NextPageDTO.from(page).body()).isNull();
-        }
-
-        @Test
-        @DisplayName("toPage decodes the body back to the original bytes (round trip with from)")
-        void toPageRoundTripsBody() {
-            byte[] originalBody = "continuation-token".getBytes();
-            Page original = new Page(
-                    "https://youtube.com/next", "pageId", List.of("id1"), null, originalBody);
-
-            KioskDTO.NextPageDTO dto = KioskDTO.NextPageDTO.from(original);
-            Page restored = KioskDTO.NextPageDTO.toPage(dto.url(), dto.id(), dto.ids(), dto.body());
-
-            assertThat(restored.getBody()).isEqualTo(originalBody);
-            assertThat(restored.getUrl()).isEqualTo(original.getUrl());
-            assertThat(restored.getId()).isEqualTo(original.getId());
-            assertThat(restored.getIds()).isEqualTo(original.getIds());
-        }
-
-        @Test
-        @DisplayName("toPage leaves body null when the DTO body is null")
-        void toPageLeavesNullBodyNull() {
-            Page restored = KioskDTO.NextPageDTO.toPage("url", "id", List.of(), null);
-
-            assertThat(restored.getBody()).isNull();
         }
     }
 
