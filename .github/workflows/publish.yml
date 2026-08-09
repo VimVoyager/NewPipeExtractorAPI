@@ -42,7 +42,8 @@ jobs:
       - name: Verify pom version matches the tag
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          POM_VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          POM_VERSION="$(mvn -B -q -N --no-transfer-progress -DforceStdout \
+            help:evaluate -Dexpression=project.version | tail -n1 | tr -d '[:space:]')"
           echo "tag=$TAG_VERSION pom=$POM_VERSION"
           if [ "$TAG_VERSION" != "$POM_VERSION" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match pom.xml version $POM_VERSION"
