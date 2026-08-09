@@ -4,11 +4,13 @@ All notable changes to this service are documented here.
 
 The format is based on [keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See [VERSIONING.md](VERSIONING.md) for how versions are chosen and released.
 
-## [0.1.1]
+## [Unreleased]
+
+## [0.1.1] - 2026-08-09
 
 ### Fixed
 
- - Subtitle format preference now runs with each language group rather than across the whole list, so a language is no longer dropped entirely because a different language matched a higher-ranked format.
+ - Subtitle format preference now runs within each language group rather than across the whole list, so a language is no longer dropped entirely because a different language matched a higher-ranked format.
  - Video `AdaptationSets` are split by mimeType and codec family, so the mimeType declared on a set always matches the `Representations` inside it. Mixed vp9/webm and avc1/mp4 sets previously produced a non-conformant manifest.
  - Video quality selection keys on numeric height instead of resolution labels, matching how the manifest generator sorts `Representations`. Labels such as `1080p60` and `1080p HDR` are now recognised.
  - Audio track preference is driven by codec metadata rather than hardcoded YouTube itag numbers, which are an implementation detail that can change without notice.
@@ -19,4 +21,5 @@ The format is based on [keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
  - Each content type now has its own `AdaptationSet` id range, keeping ids unique within a `Period` now that video can emit more than one set. Video starts at 0, audio at 50, subtitles at 100.
 
-[0.1.1]: https://github.com/VimVoyager/NewPipeExtractorApi/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/VimVoyager/NewPipeExtractorApi/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/VimVoyager/NewPipeExtractorApi/compare/v0.1.0...v0.1.1
