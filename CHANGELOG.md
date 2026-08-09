@@ -4,7 +4,7 @@ All notable changes to this service are documented here.
 
 The format is based on [keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See [VERSIONING.md](VERSIONING.md) for how versions are chosen and released.
 
-## [Unreleased]
+## [0.1.1]
 
 ### Fixed
 
@@ -19,4 +19,4 @@ The format is based on [keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
  - Each content type now has its own `AdaptationSet` id range, keeping ids unique within a `Period` now that video can emit more than one set. Video starts at 0, audio at 50, subtitles at 100.
 
-[Unreleased]: https://github.com/VimVoyager/NewPipeExtractorApi/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/VimVoyager/NewPipeExtractorApi/compare/v0.1.1...HEAD
