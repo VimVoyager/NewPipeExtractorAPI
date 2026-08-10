@@ -6,6 +6,16 @@ The format is based on [keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+ - Granular stream endpoints `/audio`, `/video`, `/subtitles`, `/thumbnails`, `/segments`, `/preview-frames`, `/description`, `/related`) bypassed the incomplete-response retry, so they could return empty or muxed-only results where `/dash` succeeded for the same video.
+ - `/api/v1/streams/video` returned muxed progressive streams instead of video-only adaptive streams.
+
+### Added
+
+ - `StreamInfo` caching keyed on video URL. Repeated requests for the same video now share one extraction instead of re-extracting per endpoint.
+ - Configurable cache settings under `opentube.cache.streaminfo`: `max-entries`, `safety-margin`, `fallback-ttl`, `degraded-ttl`, `max-ttl`
+
 ### Changed
 
  - Kiosk endpoints moved out of `NewPipeController`/`RestService` into a dedicated `KioskController` and `KioskService`
