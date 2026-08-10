@@ -1,5 +1,7 @@
 package org.example.api.service;
 
+import org.example.api.cache.StreamInfoCache;
+import org.example.api.cache.StreamInfoCacheProperties;
 import org.example.api.exception.ExtractionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +21,7 @@ import org.schabi.newpipe.extractor.stream.StreamSegment;
 import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
@@ -43,7 +46,16 @@ class VideoStreamingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new VideoStreamingService();
+        service = new VideoStreamingService(new StreamInfoCache(cacheProperties()));
+    }
+
+    private static StreamInfoCacheProperties cacheProperties() {
+        return new StreamInfoCacheProperties(
+                300,
+                Duration.ofMinutes(10),
+                Duration.ofMinutes(5),
+                Duration.ofSeconds(30),
+                Duration.ofHours(6));
     }
 
     /** A call to one of the service's accessor methods. */
@@ -243,6 +255,65 @@ class VideoStreamingServiceTest {
                     .isInstanceOf(ExtractionException.class)
                     .hasMessage("Extraction failed")
                     .hasCause(boom);
+        }
+    }
+
+    @Nested
+    @DisplayName("caching")
+    class CachingTests {
+
+        @Test
+        @DisplayName("Several accessors for one URL share a single extraction")
+        void reusesExtractionAcrossAccessors() throws Exception {
+            StreamInfo info = completeStreamInfo();
+
+            try (MockedStatic<StreamInfo> extractor = mockStatic(StreamInfo.class)) {
+                extractor.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(info);
+
+                service.getAudioStreams(TEST_URL);
+                service.getSubtitleStreams(TEST_URL);
+                service.getRelatedStreams(TEST_URL);
+
+                extractor.verify(() -> StreamInfo.getInfo(TEST_URL), times(1));
+            }
+        }
+
+        // ── Accessor delegation ──────────────────────────────────────────
+
+        @Test
+        @DisplayName("Different URLs are extracted separately")
+        void differentUrlsExtractSeparately() throws Exception {
+            String other = "https://www.youtube.com/watch?v=oHg5SJYRHA0";
+            StreamInfo info = completeStreamInfo();
+
+            try (MockedStatic<StreamInfo> extractor = mockStatic(StreamInfo.class)) {
+                extractor.when(() -> StreamInfo.getInfo(TEST_URL)).thenReturn(info);
+                extractor.when(() -> StreamInfo.getInfo(other)).thenReturn(info);
+
+                service.getStreamInfo(TEST_URL);
+                service.getStreamInfo(other);
+
+                extractor.verify(() -> StreamInfo.getInfo(TEST_URL), times(1));
+                extractor.verify(() -> StreamInfo.getInfo(other), times(1));
+            }
+        }
+
+        @Test
+        @DisplayName("A failed extraction is not cached")
+        void failuresAreNotCached() throws Exception {
+            StreamInfo info = completeStreamInfo();
+
+            try (MockedStatic<StreamInfo> extractor = mockStatic(StreamInfo.class)) {
+                extractor.when(() -> StreamInfo.getInfo(TEST_URL))
+                        .thenThrow(new RuntimeException("transient"))
+                        .thenReturn(info);
+
+                assertThatThrownBy(() -> service.getStreamInfo(TEST_URL))
+                        .isInstanceOf(ExtractionException.class);
+
+                assertThat(service.getStreamInfo(TEST_URL)).isSameAs(info);
+                extractor.verify(() -> StreamInfo.getInfo(TEST_URL), times(2));
+            }
         }
     }
 }
