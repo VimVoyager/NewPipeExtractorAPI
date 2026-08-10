@@ -2,6 +2,7 @@ package org.example.api.controller;
 
 import org.example.api.dto.StreamDetailsDTO;
 import org.example.api.dto.dash.DashManifestConfigDTO;
+import org.example.api.exception.NoStreamsAvailableException;
 import org.example.api.service.DashManifestGeneratorService;
 import org.example.api.service.VideoStreamingService;
 import org.example.api.service.StreamSelectionService;
@@ -61,7 +62,7 @@ public class StreamingController {
      */
     @GetMapping
     public ResponseEntity<StreamInfo> getStreamInfo(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Retrieving stream info for ID: {}", id);
+        logger.debug("Retrieving stream info for ID: {}", id);
 
         StreamInfo info = videoStreamingService.getStreamInfo(videoUrl(id));
         return ResponseEntity.ok(info);
@@ -72,7 +73,7 @@ public class StreamingController {
      */
     @GetMapping("/audio")
     public ResponseEntity<List<AudioStream>> getAudioStreams(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Retrieving audio stream for ID: {}", id);
+        logger.debug("Retrieving audio stream for ID: {}", id);
 
         List<AudioStream> streams = videoStreamingService.getAudioStreams(videoUrl(id));
         return ResponseEntity.ok(streams);
@@ -83,7 +84,7 @@ public class StreamingController {
      */
     @GetMapping("/video")
     public ResponseEntity<List<VideoStream>> getVideoStreams(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Retrieving video stream for ID: {}", id);
+        logger.debug("Retrieving video stream for ID: {}", id);
 
         List<VideoStream> streams = videoStreamingService.getVideoStreams(videoUrl(id));
         return ResponseEntity.ok(streams);
@@ -94,7 +95,7 @@ public class StreamingController {
      */
     @GetMapping("/video/dash")
     public ResponseEntity<String> getDashMpdUrl(@RequestParam(name = "id", required = true) String id) throws Exception {
-        logger.info("Retrieving DASH MPD URL for ID: {}", id);
+        logger.debug("Retrieving DASH MPD URL for ID: {}", id);
 
         String dashUrl = videoStreamingService.getDashMpdUrl(videoUrl(id));
         return ResponseEntity.ok(dashUrl);
@@ -105,35 +106,32 @@ public class StreamingController {
      */
     @GetMapping("/dash")
     public ResponseEntity<String> getDashManifest(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Generating optimized DASH manifest for ID: {}", id);
+        logger.debug("Generating optimized DASH manifest for ID: {}", id);
 
         String url = videoUrl(id);
 
-        // Get full stream information from NewPipe Extractor
         StreamInfo streamInfo = videoStreamingService.getStreamInfo(url);
 
-        // Get ALL available streams
         List<VideoStream> allVideoStreams = streamInfo.getVideoOnlyStreams();
         List<AudioStream> allAudioStreams = streamInfo.getAudioStreams();
         List<SubtitlesStream> allSubtitles = streamInfo.getSubtitles();
-
-        logger.info("Retrieved {} video, {} audio, {} subtitle streams",
-                allVideoStreams.size(), allAudioStreams.size(), allSubtitles.size());
 
         // SABR fallback: if adaptive streams are unavailable, use muxed streams (360p only)
         boolean isMuxedFallback = allVideoStreams.isEmpty();
 
         if (isMuxedFallback) {
             List<VideoStream> muxedStreams = streamInfo.getVideoStreams();
-            logger.warn("No adaptive streams available for ID: {} - falling back to {} muxed stream(s)", id, muxedStreams.size());
 
             if (muxedStreams.isEmpty()) {
-                logger.error("No streams available for ID: {}", id);
-                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("No streams available: YouTube may be blocking extraction for this video.");
+                throw new NoStreamsAvailableException(
+                        "No streams available — YouTube may be blocking extraction for this video"
+                );
             }
 
-            // Return the direct URL as plain text with a custom header
-            String directUrl = muxedStreams.get(0).getContent();
+            logger.warn("No adaptive streams - falling back to {} muxed stream(s)", muxedStreams.size());
+
+            String directUrl = muxedStreams.getFirst().getContent();
+            // TODO: Replace X-STREAM-TYPE header with a standardized header from MDN
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_PLAIN)
                     .header("X-Stream-Type", "muxed-progressive")
@@ -149,7 +147,6 @@ public class StreamingController {
         streamSelectionService.logSelectedStreams(selectedVideoStreams, selectedAudioStreams);
         streamSelectionService.logSelectedSubtitles(selectedSubtitles);
 
-        // Build config from selected streams
         DashManifestConfigDTO config = DashManifestConfigDTO.fromWithSelectedStreams(
                 streamInfo,
                 selectedVideoStreams,
@@ -160,7 +157,7 @@ public class StreamingController {
         // Generate manifest XML with selected streams
         String manifest = dashManifestGeneratorService.generateManifestXml(config);
 
-        logger.info("Generated optimized DASH manifest with {} characters (selected streams: {} video, {} audio, {} subtitle)",
+        logger.debug("Generated optimized DASH manifest with {} characters (selected streams: {} video, {} audio, {} subtitle)",
                 manifest.length(), selectedVideoStreams.size(), selectedAudioStreams.size(), selectedSubtitles.size());
 
         return ResponseEntity.ok()
@@ -173,7 +170,7 @@ public class StreamingController {
      */
     @GetMapping("/thumbnails")
     public ResponseEntity<List<Image>> getThumbnails(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Retrieving stream thumbnails for ID: {}", id);
+        logger.debug("Retrieving stream thumbnails for ID: {}", id);
 
         List<Image> thumbnails = videoStreamingService.getStreamThumbnails(videoUrl(id));
         return ResponseEntity.ok(thumbnails);
@@ -184,7 +181,7 @@ public class StreamingController {
      */
     @GetMapping("/subtitles")
     public ResponseEntity<List<SubtitlesStream>> getSubtitleStreams(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Retrieving subtitle streams for ID: {}", id);
+        logger.debug("Retrieving subtitle streams for ID: {}", id);
 
         List<SubtitlesStream> subtitles = videoStreamingService.getSubtitleStreams(videoUrl(id));
         return ResponseEntity.ok(subtitles);
@@ -195,7 +192,7 @@ public class StreamingController {
      */
     @GetMapping("/segments")
     public ResponseEntity<List<StreamSegment>> getStreamSegments(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Retrieving stream segments for ID: {}", id);
+        logger.debug("Retrieving stream segments for ID: {}", id);
 
         List<StreamSegment> segments = videoStreamingService.getStreamSegments(videoUrl(id));
         return ResponseEntity.ok(segments);
@@ -206,7 +203,7 @@ public class StreamingController {
      */
     @GetMapping("/preview-frames")
     public ResponseEntity<List<Frameset>> getPreviewFrames(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Retrieving preview frames stream for ID: {}", id);
+        logger.debug("Retrieving preview frames stream for ID: {}", id);
 
         List<Frameset> frames = videoStreamingService.getPreviewFrames(videoUrl(id));
         return ResponseEntity.ok(frames);
@@ -217,7 +214,7 @@ public class StreamingController {
      */
     @GetMapping("/description")
     public ResponseEntity<Description> getStreamDescription(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Retrieving description stream for ID: {}", id);
+        logger.debug("Retrieving description stream for ID: {}", id);
 
         Description description = videoStreamingService.getStreamDescription(videoUrl(id));
         return ResponseEntity.ok(description);
@@ -228,7 +225,7 @@ public class StreamingController {
      */
     @GetMapping("/details")
     public ResponseEntity<StreamDetailsDTO> getStreamDetails(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Retrieving stream details for ID: {}", id);
+        logger.debug("Retrieving stream details for ID: {}", id);
 
         StreamInfo info = videoStreamingService.getStreamInfo(videoUrl(id));
         StreamDetailsDTO details = StreamDetailsDTO.from(info);
@@ -241,7 +238,7 @@ public class StreamingController {
      */
     @GetMapping("/related")
     public ResponseEntity<List<InfoItem>> getRelatedStreams(@RequestParam(name = "id", required = true) String id) {
-        logger.info("Retrieving related streams for ID: {}", id);
+        logger.debug("Retrieving related streams for ID: {}", id);
 
         List<InfoItem> relatedItems = videoStreamingService.getRelatedStreams(videoUrl(id));
         return ResponseEntity.ok(relatedItems);
