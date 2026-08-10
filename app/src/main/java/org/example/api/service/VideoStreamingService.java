@@ -81,7 +81,7 @@ public class VideoStreamingService {
      * Extracts available video streams for a given stream URL.
      */
     public List<VideoStream> getVideoStreams(String url) throws ExtractionException {
-        return getStreamInfo(url).getVideoStreams();
+        return getStreamInfo(url).getVideoOnlyStreams();
     }
 
     /**
