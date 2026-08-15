@@ -6,7 +6,6 @@ import org.example.api.dto.dash.SubtitleMetadataDTO;
 import org.example.api.dto.dash.VideoStreamMetadataDTO;
 import org.example.api.exception.ValidationException;
 import org.example.api.utils.ManifestXmlBuilder;
-import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -24,38 +23,11 @@ public class DashManifestGeneratorService {
     private static final Logger logger = LoggerFactory.getLogger(DashManifestGeneratorService.class);
 
     private static final String DASH_NAMESPACE = "urn:mpeg:dash:schema:mpd:2011";
-    private static final String DASH_PROFILE = "urn:mpeg:dash:profile:isoff-on-demand:2011";
     private static final String DEFAULT_VIDEO_MIME_TYPE = "video/mp4";
 
     private static final int VIDEO_ADAPTATION_SET_ID_BASE = 0;
     private static final int AUDIO_ADAPTATION_SET_ID_BASE = 50;
     private static final int SUBTITLE_ADAPTATION_SET_ID_BASE = 100;
-
-    /**
-     * Generates a complete DASH manifest XML from StreamInfo.
-     *
-     * @param streamInfo The stream information from NewPipe extractor
-     * @return Complete DASH manifest XML string
-     */
-    public String generateManifest(StreamInfo streamInfo) {
-        logger.info("Generating DASH manifest for video: {}", streamInfo.getName());
-
-        // Convert StreamInfo to DTOs using existing adapter
-        DashManifestConfigDTO config = DashManifestConfigDTO.from(streamInfo);
-
-        // Validate configuration
-        validateConfig(config);
-
-        // Generate XML
-        String manifest = generateManifestXml(config);
-
-        logger.info("Generated DASH manifest with {} video, {} audio, {} subtitle streams",
-                config.getVideoStreams().size(),
-                config.getAudioStreams().size(),
-                config.getSubtitleStreams().size());
-
-        return manifest;
-    }
 
     /**
      * Generates a complete DASH manifest XML from a pre-built configuration DTO.
@@ -66,21 +38,18 @@ public class DashManifestGeneratorService {
     public String generateManifestXml(DashManifestConfigDTO config) {
         validateConfig(config);
 
-        StringBuilder xml = new StringBuilder();
-
         // XML declaration
-        xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 
-        // MPD root element
-        xml.append(generateMpdHeader(config));
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
 
-        // Period element
-        xml.append(generatePeriodElement(config));
+                // MPD root element
+                generateMpdHeader(config) +
 
-        // Close MPD
-        xml.append("</MPD>\n");
+                // Period element
+                generatePeriodElement(config) +
 
-        return xml.toString();
+                // Close MPD
+                "</MPD>\n";
     }
 
     /**
@@ -101,8 +70,6 @@ public class DashManifestGeneratorService {
         if (config.getVideoStreams() == null || config.getAudioStreams() == null || config.getSubtitleStreams() == null) {
             throw new ValidationException("Stream lists cannot be null");
         }
-
-        logger.debug("Configuration validated successfully");
     }
 
     /**
@@ -112,15 +79,12 @@ public class DashManifestGeneratorService {
      * @return MPD header XML string
      */
     private String generateMpdHeader(DashManifestConfigDTO config) {
-        StringBuilder header = new StringBuilder();
 
-        header.append("<MPD xmlns=\"").append(DASH_NAMESPACE).append("\"\n");
-        header.append("     type=\"").append(config.getType()).append("\"\n");
-        header.append("     mediaPresentationDuration=\"").append(config.getMediaPresentationDuration()).append("\"\n");
-        header.append("     minBufferTime=\"").append(config.getMinBufferTime()).append("\"\n");
-        header.append("     profiles=\"").append(config.getProfiles()).append("\">\n");
-
-        return header.toString();
+        return "<MPD xmlns=\"" + DASH_NAMESPACE + "\"\n" +
+                "     type=\"" + config.getType() + "\"\n" +
+                "     mediaPresentationDuration=\"" + config.getMediaPresentationDuration() + "\"\n" +
+                "     minBufferTime=\"" + config.getMinBufferTime() + "\"\n" +
+                "     profiles=\"" + config.getProfiles() + "\">\n";
     }
 
     /**
@@ -168,19 +132,17 @@ public class DashManifestGeneratorService {
         StringBuilder xml = new StringBuilder();
 
         List<VideoStreamMetadataDTO> rangeBacked = videoStreams.stream()
-                .filter(video -> {
-                    if (hasByteRanges(video.getInitRange(), video.getIndexRange())) {
-                        return true;
-                    }
-                    logger.warn("Video stream {} ({}p) has no byte ranges; not usable under profile {}",
-                            video.getId(), video.getHeight(), DASH_PROFILE);
-                    return false;
-                })
+                .filter(video -> hasByteRanges(video.getInitRange(), video.getIndexRange()))
                 .toList();
+
+        int dropped = videoStreams.size() - rangeBacked.size();
+        if (dropped > 0) {
+            logger.debug("Dropped {} video stream(s) without byte ranges", dropped);
+        }
 
         List<VideoStreamMetadataDTO> usable = rangeBacked;
         if (rangeBacked.isEmpty()) {
-            logger.error("No video streams carry byte ranges; emitting all {} without SegmentBase",
+            logger.warn("No video streams carry byte ranges; emitting all {} without SegmentBase",
                     videoStreams.size());
             usable = videoStreams;
         }
@@ -333,17 +295,20 @@ public class DashManifestGeneratorService {
         StringBuilder xml = new StringBuilder();
 
         List<AudioStreamMetadataDTO> rangeBacked = audioStreams.stream()
-                .filter(audio -> {
-                    if (hasByteRanges(audio.getInitRange(), audio.getIndexRange())) {
-                        return true;
-                    }
-                    logger.warn("Audio stream {} ({}) has no byte ranges; not usable under profile {}",
-                            audio.getId(), audio.getLanguage(), DASH_PROFILE);
-                    return false;
-                })
+                .filter(audio -> hasByteRanges(audio.getInitRange(), audio.getIndexRange()))
                 .toList();
 
-        List<AudioStreamMetadataDTO> usable = rangeBacked.isEmpty() ? audioStreams : rangeBacked;
+        int dropped = audioStreams.size() - rangeBacked.size();
+        if (dropped > 0) {
+            logger.debug("Dropped {} audio stream(s) without byte ranges", dropped);
+        }
+
+        List<AudioStreamMetadataDTO> usable = rangeBacked;
+        if (rangeBacked.isEmpty()) {
+            logger.warn("No audio streams carry byte ranges; emitting all {} without SegmentBase",
+                    audioStreams.size());
+            usable = audioStreams;
+        }
 
         // Group by language
         Map<String, List<AudioStreamMetadataDTO>> streamsByLanguage = usable.stream()
@@ -572,22 +537,17 @@ public class DashManifestGeneratorService {
      * @return SegmentBase XML string
      */
     private String generateSegmentBase(String initRange, String indexRange) {
-        StringBuilder xml = new StringBuilder();
         int indentLevel = 4;
 
-        xml.append(ManifestXmlBuilder.indent(indentLevel))
-                .append("<SegmentBase indexRange=\"")
-                .append(indexRange)
-                .append("\">\n");
-
-        xml.append(ManifestXmlBuilder.indent(indentLevel + 1))
-                .append("<Initialization range=\"")
-                .append(initRange)
-                .append("\"/>\n");
-
-        xml.append(ManifestXmlBuilder.indent(indentLevel))
-                .append("</SegmentBase>\n");
-
-        return xml.toString();
+        return ManifestXmlBuilder.indent(indentLevel) +
+                "<SegmentBase indexRange=\"" +
+                indexRange +
+                "\">\n" +
+                ManifestXmlBuilder.indent(indentLevel + 1) +
+                "<Initialization range=\"" +
+                initRange +
+                "\"/>\n" +
+                ManifestXmlBuilder.indent(indentLevel) +
+                "</SegmentBase>\n";
     }
 }
