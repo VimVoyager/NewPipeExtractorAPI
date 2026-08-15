@@ -29,8 +29,8 @@ public class PlaylistController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getPlaylistInfo(@RequestParam(name = "id") String id) throws Exception {
-        logger.info("Retrieving playlist info for id: {}", id);
+    public ResponseEntity<PlaylistDTO> getPlaylistInfo(@RequestParam(name = "id") String id){
+        logger.debug("Retrieving playlist info for id: {}", id);
 
         String url = YOUTUBE_PLAYLIST_URL + id;
         ValidationUtils.requireValidUrl(url);
@@ -41,11 +41,11 @@ public class PlaylistController {
     }
 
     @GetMapping("/page")
-    public ResponseEntity<?> getPlaylistPage(
+    public ResponseEntity<InfoItemsPage<StreamInfoItem>> getPlaylistPage(
             @RequestParam(name = "url") String url,
             @RequestParam(name = "pageUrl") String pageUrl
-    ) throws Exception {
-        logger.info("Retrieving playlist page for url: {}, pageUrl: {}", url, pageUrl);
+    ) {
+        logger.debug("Retrieving playlist page for url: {}", url);
 
         ValidationUtils.requireValidUrl(url);
         ValidationUtils.requireValidUrl(pageUrl);

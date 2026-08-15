@@ -15,24 +15,28 @@ import org.springframework.stereotype.Service;
 public class PlaylistService {
     private static final Logger logger = LoggerFactory.getLogger(PlaylistService.class);
 
-    public PlaylistInfo getPlaylistInfo(String url) throws Exception {
+    public PlaylistInfo getPlaylistInfo(String url) throws ExtractionException {
         try {
-            logger.info("Extracting playlist info for URL {}:", url);
-            return PlaylistInfo.getInfo(url);
+            PlaylistInfo info = PlaylistInfo.getInfo(url);
+            logger.info("Extracted playlist '{}' with {} item(s)", info.getName(), info.getRelatedItems().size());
+            return info;
         } catch (Exception e) {
-            logger.error("Failed to extract playlist info for URL {}:", url, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }
 
     public InfoItemsPage<StreamInfoItem> getPlaylistPage( String url, String pageUrl) {
         try {
+            logger.debug("Extracting playlist page for URL: {}", url);
+
             StreamingService service = NewPipe.getServiceByUrl(url);
             Page pageInstance = new Page(pageUrl);
-            logger.error("Failed to extract playlist page for URL {}:", url);
+            InfoItemsPage<StreamInfoItem> page = PlaylistInfo.getMoreItems(service, url, pageInstance);
+
+            logger.info("Extracted playlist page with {} item(s) (hasNextPage={})",
+                    page.getItems().size(), page.getNextPage());
             return PlaylistInfo.getMoreItems(service, url, pageInstance);
         } catch (Exception e) {
-            logger.error("Failed to extract playlist page for URL {}:", url, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }

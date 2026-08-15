@@ -2,7 +2,6 @@ package org.example.api.controller;
 
 import org.example.api.dto.channels.ChannelDTO;
 import org.example.api.dto.channels.ChannelTabDTO;
-import org.example.api.exception.ExtractionException;
 import org.example.api.service.ChannelService;
 import org.example.api.service.ChannelTabService;
 import org.example.api.utils.ValidationUtils;
@@ -32,8 +31,8 @@ public class ChannelController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getChannelInfo(@RequestParam(name = "id") String id) throws Exception {
-        logger.info("Retrieving channel info for ID: {}", id);
+    public ResponseEntity<ChannelDTO> getChannelInfo(@RequestParam(name = "id") String id) {
+        logger.debug("Retrieving channel info for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
         ValidationUtils.requireValidUrl(url);
@@ -48,8 +47,8 @@ public class ChannelController {
     public ResponseEntity<ChannelTabDTO> getChannelTab(
             @RequestParam(name = "id") String id,
             @RequestParam(name = "tab", defaultValue = ChannelTabs.VIDEOS) String tab
-    ) throws ExtractionException {
-        logger.info("Fetching channel tab '{}' for ID: {}", tab, id);
+    ) {
+        logger.debug("Fetching channel tab '{}' for ID: {}", tab, id);
 
         String channelUrl = YOUTUBE_URL + id;
         ValidationUtils.requireValidUrl(channelUrl);
@@ -78,8 +77,8 @@ public class ChannelController {
             @RequestParam(name = "pageUrl") String pageUrl,
             @RequestParam(name = "pageBody") String pageBody,
             @RequestParam(name = "pageIds") List<String> pageIds
-    ) throws Exception {
-        logger.info("Retrieving channel tab '{}' page for channelId: {}", tab, channelId);
+    ) {
+        logger.debug("Retrieving channel tab '{}' page for channelId: {}", tab, channelId);
 
         ChannelTabDTO result = channelTabService.getChannelTabPage(
                 channelId, tab, pageUrl, pageBody, pageIds);

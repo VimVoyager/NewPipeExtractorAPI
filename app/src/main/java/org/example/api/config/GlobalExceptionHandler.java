@@ -1,8 +1,10 @@
 package org.example.api.config;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.example.api.dto.ErrorResponseDTO;
 import org.example.api.exception.ApiException;
 import org.example.api.exception.ExtractionException;
+import org.example.api.exception.NoStreamsAvailableException;
 import org.example.api.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,6 +105,24 @@ public class GlobalExceptionHandler {
         error.setPath(request.getDescription(false).replace("uri=", ""));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Handle No stream available exception (503 Service Unavailable Error)
+     */
+    @ExceptionHandler(NoStreamsAvailableException.class)
+    public ResponseEntity<ErrorResponseDTO> handleNoStreamsAvailable(
+            NoStreamsAvailableException ex, WebRequest request) {
+        logger.warn("No streams available: {}", ex.getMessage());
+
+        ErrorResponseDTO error = new ErrorResponseDTO(
+                ex.getHttpStatus(),
+                HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase(),
+                ex.getMessage(),
+                ex.getErrorCode());
+        error.setPath(request.getDescription(false).replace("uri=", ""));
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
     }
 
     /**

@@ -29,8 +29,8 @@ public class CommentController {
     }
 
     @GetMapping("/comments")
-    public ResponseEntity<?> getComments(@RequestParam(name = "id") String id) throws Exception {
-        logger.info("Retrieving comments info for ID: {}", id);
+    public ResponseEntity<CommentsDTO.CommentsResponseDto> getComments(@RequestParam(name = "id") String id) {
+        logger.debug("Retrieving comments info for ID: {}", id);
 
         String url = YOUTUBE_URL + id;
         ValidationUtils.requireValidUrl(url);
@@ -42,11 +42,11 @@ public class CommentController {
     }
 
     @GetMapping("/comments/page")
-    public ResponseEntity<?> getCommentsPage(
+    public ResponseEntity<ListExtractor.InfoItemsPage<CommentsInfoItem>> getCommentsPage(
             @RequestParam(name = "id") String id,
             @RequestParam(name = "pageUrl") String pageUrl
-    ) throws Exception {
-        logger.info("Retrieving comments page for id: {}, pageUrl: {}", id, pageUrl);
+    ) {
+        logger.debug("Retrieving comments page for id: {}", id);
 
         String url = YOUTUBE_URL + id;
         ValidationUtils.requireValidUrl(url);

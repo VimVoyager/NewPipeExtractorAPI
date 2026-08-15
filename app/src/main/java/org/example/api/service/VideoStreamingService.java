@@ -65,7 +65,6 @@ public class VideoStreamingService {
                     info.getVideoStreams().size());
             return info;
         } catch (Exception e) {
-            logger.error("Failed to extract stream info for URL: {}", url, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }

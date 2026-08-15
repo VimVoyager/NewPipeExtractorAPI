@@ -19,8 +19,18 @@ import java.util.UUID;
 public class MDCFilter extends OncePerRequestFilter {
 
     @Override
-    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain chain
+    ) throws ServletException, IOException {
         MDC.put(LogContext.REQUEST_ID, UUID.randomUUID().toString().substring(0, 8));
+
+        String videoID = request.getParameter("id");
+        if (videoID != null && !videoID.isBlank()) {
+            MDC.put(LogContext.RESOURCE_ID, videoID);
+        }
+
         try {
             chain.doFilter(request, response);
         } finally {

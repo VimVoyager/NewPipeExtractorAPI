@@ -46,19 +46,16 @@ public class SearchService {
             );
             extractor.fetchPage();
 
-
             SearchInfo info = SearchInfo.getInfo(extractor);
             SearchResultDTO dto = SearchResultDTO.from(info);
 
-//            List<SearchItemDTO> videoItems = filterVideosOnly(dto.getItems());
             List<SearchItemDTO> uniqueItems = deduplicateByUrl(dto.getItems());
             dto.setItems(uniqueItems);
 
-            logger.info("Search completed. Found {} unique results", uniqueItems.size());
+            logger.info("Search completed with {} unique results(s)", uniqueItems.size());
 
             return dto;
         } catch (Exception e) {
-            logger.error("Failed to retrieve search results for: {}", searchString, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }
@@ -66,8 +63,7 @@ public class SearchService {
     /**
      * Retrieves the next page of search results.
      *
-     * <p>Mirrors the pattern used in {@link ChannelTabService#getChannelTabPage}: a
-     * {@link SearchExtractor} is obtained for the original query, initialized with
+     * <p>{@link SearchExtractor} is obtained for the original query, initialized with
      * {@code fetchPage()} to establish the InnerTube session state, and then
      * {@code getPage(pageInstance)} is called with the reconstructed {@link Page}.
      * Using {@code SearchInfo.getMoreItems()} without this initialization step skips
@@ -77,7 +73,7 @@ public class SearchService {
      * @param contentFilters list of filters
      * @param sortFilter     sort method
      * @param pageUrl        from {@code nextPage.url} in the previous response
-     * @param pageId      from {@code nextPage.Id} in the previous response
+     * @param pageId         from {@code nextPage.Id} in the previous response
      */
     public SearchPageDTO getSearchPage(
             String searchString,
@@ -87,7 +83,7 @@ public class SearchService {
             String pageId
     ) throws ExtractionException {
         try {
-            logger.info("Retrieving search page for: {}", searchString);
+            logger.debug("Retrieving search page for: {}", searchString);
 
             StreamingService service = NewPipe.getService(YOUTUBE_SERVICE_ID);
 
@@ -102,32 +98,24 @@ public class SearchService {
 
             SearchPageDTO dto = SearchPageDTO.from(page);
 
-//            List<SearchItemDTO> videoItems = filterVideosOnly(dto.getItems());
             List<SearchItemDTO> uniqueItems = deduplicateByUrl(dto.getItems());
             dto.setItems(uniqueItems);
             dto.setItemCount(uniqueItems.size());
 
-            logger.info("Retrieved page with {} unique results", uniqueItems.size());
+            logger.info("Retrieved page with {} unique result(s)", uniqueItems.size());
 
             return dto;
         } catch (Exception e) {
-            logger.error("Failed to retrieve search page for: {}", searchString, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }
-
-//    private List<SearchItemDTO> filterVideosOnly(List<SearchItemDTO> items) {
-//        return items.stream()
-//                .filter(item -> "stream".equalsIgnoreCase(item.getType()))
-//                .collect(Collectors.toList());
-//    }
 
     private List<SearchItemDTO> deduplicateByUrl(List<SearchItemDTO> items) {
         return new ArrayList<>(items.stream()
                 .collect(Collectors.toMap(
                         SearchItemDTO::getUrl,
                         item -> item,
-                        (existing, replacement) -> existing,
+                        (existing, _) -> existing,
                         LinkedHashMap::new
                 ))
                 .values());

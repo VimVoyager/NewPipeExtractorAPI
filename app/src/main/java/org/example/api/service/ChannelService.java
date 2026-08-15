@@ -12,8 +12,9 @@ public class ChannelService {
 
     public ChannelInfo getChannelInfo(String url) throws ExtractionException {
         try {
-            logger.info("Extracting channel info for URL: {}", url);
-            return ChannelInfo.getInfo(url);
+            ChannelInfo info = ChannelInfo.getInfo(url);
+            logger.info("Extracting channel info: '{}'", info.getName());
+            return info;
         } catch (Exception e) {
             logger.error("Failed to extract channel info for URL: {}", url, e);
             throw new ExtractionException(e.getMessage(), e);

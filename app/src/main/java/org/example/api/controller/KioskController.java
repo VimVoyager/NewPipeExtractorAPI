@@ -1,7 +1,6 @@
 package org.example.api.controller;
 
 import org.example.api.dto.kiosk.KioskDTO;
-import org.example.api.exception.ExtractionException;
 import org.example.api.service.KioskService;
 import org.schabi.newpipe.extractor.kiosk.KioskInfo;
 import org.slf4j.Logger;
@@ -29,8 +28,7 @@ public class KioskController {
      * Returns the kiosk IDs available for a service,
      */
     @GetMapping
-    public ResponseEntity<List<String>> getKioskIds() throws ExtractionException {
-        logger.info("Retrieving kiosk IDs");
+    public ResponseEntity<List<String>> getKioskIds() {
 
         List<String> kioskIds = kioskService.getKioskIds(YOUTUBE_SERVICE_ID);
         return ResponseEntity.ok(kioskIds);
@@ -42,8 +40,8 @@ public class KioskController {
     @GetMapping("/{kioskId}")
     public ResponseEntity<KioskDTO> getKioskInfo(
             @PathVariable(name = "kioskId") String kioskId
-    ) throws ExtractionException {
-        logger.info("Retrieving kiosk info for kioskId: {}", kioskId);
+    ) {
+        logger.debug("Retrieving kiosk info for kioskId: {}", kioskId);
 
         KioskInfo info = kioskService.getKioskInfo(YOUTUBE_SERVICE_ID, kioskId);
         return ResponseEntity.ok(KioskDTO.from(info));

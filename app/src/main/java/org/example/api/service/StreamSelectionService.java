@@ -49,8 +49,8 @@ public class StreamSelectionService {
 
     /** Codec first, then bitrate descending. */
     private static final Comparator<AudioStream> AUDIO_PREFERENCE =
-            Comparator.<AudioStream>comparingInt(StreamSelectionService::audioCodecRank)
-                    .thenComparing(Comparator.<AudioStream>comparingInt(StreamSelectionService::bitrateOf).reversed());
+            Comparator.comparingInt(StreamSelectionService::audioCodecRank)
+                    .thenComparing(Comparator.comparingInt(StreamSelectionService::bitrateOf).reversed());
 
     /**
      * Select optimal video streams for DASH manifest
@@ -68,7 +68,7 @@ public class StreamSelectionService {
             return Collections.emptyList();
         }
 
-        logger.info("Selecting from {} usable video streams", candidates.size());
+        logger.debug("Selecting from {} usable video streams", candidates.size());
 
         // One stream per distinct height, keeping the highest bitrate at each
         Map<Integer, VideoStream> bestByHeight = new HashMap<>();
@@ -102,7 +102,17 @@ public class StreamSelectionService {
 
         logger.info("Selected {} video streams from {} available",
                 selectedStreams.size(), allVideoStreams.size());
+
+        logVideoSelection(selectedStreams);
         return selectedStreams;
+    }
+
+    private void logVideoSelection(List<VideoStream> streams) {
+        if (!logger.isDebugEnabled()) return;
+        logger.debug("Selected video: {}", streams.stream()
+                .map(s -> s.getResolution() + "/" + formatName(s) + "@" + s.getBitrate())
+                .collect(Collectors.joining(", "))
+        );
     }
 
     /**
@@ -125,14 +135,18 @@ public class StreamSelectionService {
 
     private <T extends Stream> List<T> filterProgressiveHttp(List<T> streams, String kind) {
         List<T> progressive = new ArrayList<>();
+        int skipped = 0;
 
         for (T stream : streams) {
             if (stream.getDeliveryMethod() == DeliveryMethod.PROGRESSIVE_HTTP) {
                 progressive.add(stream);
             } else {
-                logger.warn("Skipping {} stream {} with unsupported delivery method {}",
-                        kind, stream.getId(), stream.getDeliveryMethod());
+                skipped++;
             }
+        }
+
+        if (skipped > 0) {
+            logger.debug("Skipping {} {} stream(s) with non-progressive delivery", skipped, kind);
         }
 
         return progressive;
@@ -154,7 +168,7 @@ public class StreamSelectionService {
             return Collections.emptyList();
         }
 
-        logger.info("Selecting from {} usable audio streams", candidates.size());
+        logger.debug("Selecting from {} usable audio streams", candidates.size());
 
         Map<String, List<AudioStream>> languageGroups = groupAudioStreamsByLanguage(candidates);
 
@@ -173,7 +187,15 @@ public class StreamSelectionService {
 
         logger.info("Selected {} audio streams ({} languages) from {} available",
                 selectedStreams.size(), languageGroups.size(), allAudioStreams.size());
+        logAudioSelection(selectedStreams);
         return selectedStreams;
+    }
+
+    private void logAudioSelection(List<AudioStream> streams) {
+        if (!logger.isDebugEnabled()) return;
+        logger.debug("Selected audio: {}", streams.stream()
+                .map(s -> extractLanguage(s) + "/" + formatName(s) + "@" + s.getBitrate())
+                .collect(Collectors.joining(", ")));
     }
 
     /**
@@ -181,11 +203,11 @@ public class StreamSelectionService {
      */
     public List<SubtitlesStream> selectSubtitles(List<SubtitlesStream> allSubtitles) {
         if (allSubtitles == null || allSubtitles.isEmpty()) {
-            logger.info("No subtitles available for selection");
+            logger.debug("No subtitles available for selection");
             return Collections.emptyList();
         }
 
-        logger.info("Selecting from {} total subtitle streams", allSubtitles.size());
+        logger.debug("Selecting from {} total subtitle streams", allSubtitles.size());
 
         // Filter by preferred formats
         List<SubtitlesStream> formatFiltered = filterSubtitlesByFormat(allSubtitles);
@@ -196,8 +218,19 @@ public class StreamSelectionService {
         // Sort by language priority
         deduplicated.sort(this::compareSubtitlesByLanguage);
 
-        logger.info("Selected {} subtitle streams from {} available", deduplicated.size(), allSubtitles.size());
+        logger.debug("Selected {} subtitle streams from {} available", deduplicated.size(), allSubtitles.size());
+
+        logSubtitleSelection(deduplicated);
         return deduplicated;
+    }
+
+    private void logSubtitleSelection(List<SubtitlesStream> subtitles) {
+        if (!logger.isDebugEnabled()) return;
+        logger.debug("Selected subtitles: {}", subtitles.stream()
+                .map(s -> extractLanguage(s) + "/" + formatName(s)
+                        + "/" + (s.isAutoGenerated() ? "(auto)" : ""))
+                .collect(Collectors.joining(", "))
+        );
     }
 
     /**
@@ -208,7 +241,7 @@ public class StreamSelectionService {
 
         for (AudioStream stream : streams) {
             String language = extractLanguage(stream);
-            languageMap.computeIfAbsent(language, k -> new ArrayList<>()).add(stream);
+            languageMap.computeIfAbsent(language, _ -> new ArrayList<>()).add(stream);
         }
 
         return languageMap;
@@ -346,7 +379,7 @@ public class StreamSelectionService {
 
         for (SubtitlesStream subtitle : subtitles) {
             languageGroups
-                    .computeIfAbsent(extractLanguage(subtitle), k -> new ArrayList<>())
+                    .computeIfAbsent(extractLanguage(subtitle), _ -> new ArrayList<>())
                     .add(subtitle);
         }
 
@@ -430,57 +463,5 @@ public class StreamSelectionService {
         }
 
         return langA.compareTo(langB);
-    }
-
-    /**
-     * Log selected streams for debugging
-     */
-    public void logSelectedStreams(List<VideoStream> videoStreams, List<AudioStream> audioStreams) {
-        if (videoStreams == null || videoStreams.isEmpty()) {
-            logger.warn("No suitable video streams found");
-        } else {
-            logger.info("Selected {} video streams:", videoStreams.size());
-            for (int i = 0; i < videoStreams.size(); i++) {
-                VideoStream stream = videoStreams.get(i);
-                logger.info("  {}. {} - {} - {} bps",
-                        i + 1, stream.getResolution(), formatName(stream), stream.getBitrate());
-            }
-        }
-
-        if (audioStreams == null || audioStreams.isEmpty()) {
-            logger.warn("No suitable audio streams found");
-        } else {
-            logger.info("Selected {} audio streams:", audioStreams.size());
-            for (int i = 0; i < audioStreams.size(); i++) {
-                AudioStream stream = audioStreams.get(i);
-                String languageName = stream.getAudioTrackName() != null
-                        ? stream.getAudioTrackName()
-                        : "Unknown";
-                logger.info("  {}. {} ({}) - {} - {} bps",
-                        i + 1, languageName, extractLanguage(stream), formatName(stream), bitrateOf(stream));
-            }
-        }
-    }
-
-    /**
-     * Log selected subtitles for debugging
-     */
-    public void logSelectedSubtitles(List<SubtitlesStream> subtitles) {
-        if (subtitles.isEmpty()) {
-            logger.info("No subtitles available");
-            return;
-        }
-
-        logger.info("Selected {} subtitle tracks:", subtitles.size());
-        for (int i = 0; i < subtitles.size(); i++) {
-            SubtitlesStream subtitle = subtitles.get(i);
-            String type = subtitle.isAutoGenerated() ? "auto" : "manual";
-            String lang = extractLanguage(subtitle);
-            String displayName = subtitle.getDisplayLanguageName() != null
-                    ? subtitle.getDisplayLanguageName()
-                    : lang.toUpperCase();
-            logger.info("  {}. {} ({}) - {} [{}]",
-                    i + 1, displayName, lang, formatName(subtitle), type);
-        }
     }
 }
