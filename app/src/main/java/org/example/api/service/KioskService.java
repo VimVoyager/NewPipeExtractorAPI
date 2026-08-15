@@ -17,29 +17,35 @@ public class KioskService {
 
     public List<String> getKioskIds(int serviceId) throws ExtractionException {
         try {
-            logger.info("Extracting kiosk IDs for serviceId: {}", serviceId);
+            List<String> kioskIds = List.copyOf(NewPipe.getService(serviceId)
+                    .getKioskList()
+                    .getAvailableKiosks()
+            );
+            logger.info("Extracted {} kiosk ID(s)", kioskIds.size());
             return List.copyOf(NewPipe.getService(serviceId)
                     .getKioskList()
                     .getAvailableKiosks());
         } catch (Exception e) {
-            logger.error("Failed to extract kiosk IDs for serviceId: {}", serviceId, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }
 
     public KioskInfo getKioskInfo(int serviceId, String kioskId) throws ExtractionException {
         try {
-            logger.info("Extracting kiosk info for kioskId: {}, serviceId: {}", kioskId, serviceId);
+            logger.debug("Extracting kiosk info for kioskId: {}", kioskId);
 
             StreamingService service = NewPipe.getService(serviceId);
 
             KioskExtractor<?> extractor = service.getKioskList().getExtractorById(kioskId, null);
             extractor.fetchPage();
 
-            return KioskInfo.getInfo(extractor);
+            KioskInfo info = KioskInfo.getInfo(extractor);
+
+            logger.info("Extracted {} item(s) from kiosk '{}'",
+                    info.getRelatedItems().size(), kioskId);
+
+            return info;
         } catch (Exception e) {
-            logger.error("Failed to extract kiosk info for kioskId: {}, serviceId: {}",
-                    kioskId, serviceId, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }

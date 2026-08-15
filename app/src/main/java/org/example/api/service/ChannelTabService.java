@@ -58,7 +58,7 @@ public class ChannelTabService {
             extractor.fetchPage();
             ChannelTabInfo tabInfo = ChannelTabInfo.getInfo(extractor);
 
-            logger.info("Fetched {} items from tab '{}' (hasNextPage={})",
+            logger.info("Fetched {} item(s) from tab '{}' (hasNextPage={})",
                     tabInfo.getRelatedItems().size(), tab, tabInfo.hasNextPage());
 
             return ChannelTabDTO.from(tabInfo, tab, channelId);
@@ -66,7 +66,6 @@ public class ChannelTabService {
         } catch (ExtractionException e) {
             throw e;
         } catch (Exception e) {
-            logger.error("Failed to fetch channel tab '{}' for URL: {}", tab, channelUrl, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }
@@ -74,17 +73,11 @@ public class ChannelTabService {
     /**
      * Fetches a subsequent page of channel tab items.
      *
-     * <p><b>Root cause of the previous NPE:</b> {@code YoutubeChannelTabExtractor.getPage()}
-     * reads two things from the {@link Page} object it receives:</p>
-     * <ol>
-     *   <li>{@code page.getBody()} — a JSON POST body containing the continuation token.
-     *       Without it, the InnerTube browse request has no continuation and YouTube
-     *       returns page 1 again.</li>
-     *   <li>{@code page.getIds()} — a {@code List<String>} of
-     *       {@code ["channelName", "channelUrl", "verifiedStatus"]} used to annotate
-     *       returned items with uploader metadata. Without it, the local variable
-     *       {@code channelIds} is null, causing the NPE in {@code collectItemsFrom}.</li>
-     * </ol>
+     * <p>{@link ChannelTabExtractor} is obtained for the original query, initialized with
+     * {@code fetchPage()} to establish the InnerTube session state, and then
+     * {@code getPage(pageInstance)} is called with reconstructed {@link Page}.
+     * Using {@code ChannelTabInfo.getMoreItems} without this initialization step skips
+     * the extractor setup and results in empty pages</p>
      *
      * @param channelId   channel ID — for the response DTO
      * @param tab         tab type string matching the initial request
@@ -96,9 +89,8 @@ public class ChannelTabService {
                                            String pageUrl, String pageBody, List<String> pageIds)
             throws ExtractionException {
         try {
-            logger.info("Fetching next page for channel tab '{}', channelId: {}", tab, channelId);
+            logger.debug("Fetching next page for channel tab '{}', channelId: {}", tab, channelId);
 
-            // Reconstruct the full Page with url + body + ids — all three are required.
             byte[] bodyBytes = pageBody != null ? Base64.getDecoder().decode(pageBody) : null;
             Page pageInstance = new Page(pageUrl, null, pageIds, null, bodyBytes);
 
@@ -124,7 +116,7 @@ public class ChannelTabService {
 
             InfoItemsPage<InfoItem> page = extractor.getPage(pageInstance);
 
-            logger.info("Fetched {} items from tab '{}' page (hasNextPage={})",
+            logger.info("Fetched {} item(s) from tab '{}' page (hasNextPage={})",
                     page.getItems().size(), tab, page.hasNextPage());
 
             return ChannelTabDTO.fromPage(page, tab, channelId);
@@ -132,7 +124,6 @@ public class ChannelTabService {
         } catch (ExtractionException e) {
             throw e;
         } catch (Exception e) {
-            logger.error("Failed to fetch channel tab page for tab '{}', channelId: {}", tab, channelId, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }

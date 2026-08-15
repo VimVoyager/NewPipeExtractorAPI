@@ -18,10 +18,11 @@ public class CommentService {
 
     public CommentsInfo getCommentsInfo(String url) throws ExtractionException {
         try {
-            logger.info("Extracting comments for URL: {}", url);
-            return CommentsInfo.getInfo(url);
+            CommentsInfo info = CommentsInfo.getInfo(url);
+
+            logger.info("Extracted {} comment(s)", info.getRelatedItems().size());
+            return info;
         } catch (Exception e) {
-            logger.error("Failed to extract comments for URL: {}", url, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }
@@ -29,12 +30,11 @@ public class CommentService {
     public ListExtractor.InfoItemsPage<CommentsInfoItem> getCommentsPage(String url, String pageUrl) throws ExtractionException {
         try {
             //TODO optimize this. init page is fetched every time
-            logger.info("Extracting comments page for URL: {}", url);
+            logger.debug("Extracting comments page for URL: {}", url);
             CommentsInfo info = CommentsInfo.getInfo(url);
             Page pageInstance = new Page(pageUrl);
             return CommentsInfo.getMoreItems(info, pageInstance);
         } catch (Exception e) {
-            logger.error("Failed to extract comments page for URL: {}", url, e);
             throw new ExtractionException(e.getMessage(), e);
         }
     }
