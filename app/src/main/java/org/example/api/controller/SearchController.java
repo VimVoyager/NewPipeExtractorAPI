@@ -40,7 +40,7 @@ public class SearchController {
             @RequestParam(name = "contentFilters", required = false) String contentFilters
     ) {
         searchString = searchString.trim();
-        logger.info("Search request received for: {}", searchString);
+        logger.debug("Search request received for: {}", searchString);
 
         ValidationUtils.requireNonEmpty(searchString, "searchString");
 
@@ -77,7 +77,7 @@ public class SearchController {
             @RequestParam(name = "sortFilter", required = false) String sortFilter,
             @RequestParam(name = "contentFilters", required = false) String contentFilters
     ) {
-        logger.info("Search page request for: {}", searchString);
+        logger.debug("Search page request for: {}", searchString);
 
         ValidationUtils.requireNonEmpty(searchString, "searchString");
         ValidationUtils.requireNonEmpty(pageUrl, "pageUrl");
