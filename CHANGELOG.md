@@ -6,6 +6,8 @@ The format is based on [keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-16
+
 ### Added
 
  - `StreamInfo` caching keyed on video URL. Repeated requests for the same video now share one extraction instead of re-extracting per endpoint.
@@ -44,5 +46,6 @@ The format is based on [keep a Changelog](https://keepachangelog.com/en/1.1.0/),
  - Streams that are not delivered over progressive HTTP, and streams without both an init and index byte range, are filtered out with a log line rather than being emitted as unplayable `Representations`.
  - Replaced `assert` statements in stream selection and logging with real null checks. Assertions are disabled at runtime unless `-ea` is set, so they provided no protection in production.
 
-[Unreleased]: https://github.com/VimVoyager/NewPipeExtractorApi/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/VimVoyager/NewPipeExtractorApi/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/VimVoyager/NewPipeExtractorApi/compare/v1.1.1...v0.2.0
 [0.1.1]: https://github.com/VimVoyager/NewPipeExtractorApi/compare/v0.1.0...v0.1.1
